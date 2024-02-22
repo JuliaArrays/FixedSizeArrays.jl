@@ -4,7 +4,7 @@ export FixedSizeArray, FixedSizeVector, FixedSizeMatrix
 
 struct FixedSizeArray{T,N} <: DenseArray{T,N}
     mem::Memory{T}
-    const size::NTuple{N,Int}
+    size::NTuple{N,Int}
 end
 
 const FixedSizeVector{T} = FixedSizeArray{T,1}
