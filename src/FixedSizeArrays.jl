@@ -2,9 +2,9 @@ module FixedSizeArrays
 
 export FixedSizeArray, FixedSizeVector, FixedSizeMatrix
 
-mutable struct FixedSizeArray{T,N} <: DenseArray{T,N}
+struct FixedSizeArray{T,N} <: DenseArray{T,N}
     mem::Memory{T}
-    const size::NTuple{N,Int}
+    size::NTuple{N,Int}
 end
 
 const FixedSizeVector{T} = FixedSizeArray{T,1}
