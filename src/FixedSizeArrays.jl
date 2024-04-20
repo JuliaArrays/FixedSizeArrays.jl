@@ -14,23 +14,9 @@ function (self::Type{FixedSizeArray{T,N}})(::UndefInitializer, size::Vararg{Int,
     return FixedSizeArray(Memory{T}(undef, prod(size)), size)
 end
 
-Base.@propagate_inbounds function Base.setindex!(A::FixedSizeArray{T}, x, i::Int) where {T}
-    getfield(A, :mem)[i] = x
-    return A
-end
-Base.@inline function Base.setindex!(A::FixedSizeArray{T}, x, i1::Int, i2::Int, I::Int...) where {T}
-    @boundscheck checkbounds(A, i1, i2, I...) # generally _to_linear_index requires bounds checking
-    getfield(A, :mem)[Base._to_linear_index(A, i1, i2, I...)] = x
-    return A
-end
-Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray, i::Int)
-    getfield(A, :mem)[i]
-end
-function Base.getindex(A::FixedSizeArray, i1::Int, i2::Int, I::Int...)
-    @inline
-    @boundscheck checkbounds(A, i1, i2, I...) # generally _to_linear_index requires bounds checking
-    return @inbounds A[Base._to_linear_index(A, i1, i2, I...)]
-end
+Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
+Base.@propagate_inbounds Base.getindex(A::FixedSizeArray, i::Int) = A.mem[i]
+Base.@propagate_inbounds Base.setindex!(A::FixedSizeArray, v, i::Int) = A.mem[i] = v
 
 Base.size(a::FixedSizeArray) = getfield(a, :size)
 
