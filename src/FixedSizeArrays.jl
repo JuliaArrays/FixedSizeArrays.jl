@@ -10,7 +10,7 @@ end
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-function (self::Type{FixedSizeArray{T,N}})(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
+function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
     return FixedSizeArray(Memory{T}(undef, prod(size)), size)
 end
 
