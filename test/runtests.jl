@@ -13,6 +13,9 @@ using FixedSizeArrays
         @test eltype(similar(v, Int)) == Int
         @test copy(v) isa FixedSizeVector{Float64}
         @test zero(v) isa FixedSizeVector{Float64}
+        @test similar(FixedSizeVector{Int}, (2,)) isa FixedSizeVector{Int}
+        @test similar(FixedSizeArray{Int}, (2,)) isa FixedSizeVector{Int}
+        @test FixedSizeArray{Int}(undef, 2) isa FixedSizeVector{Int}
     end
 
     @testset "FixedSizeMatrix" begin
@@ -26,5 +29,8 @@ using FixedSizeArrays
         @test eltype(similar(m, Int)) == Int
         @test copy(m) isa FixedSizeMatrix{Float64}
         @test zero(m) isa FixedSizeMatrix{Float64}
+        @test similar(FixedSizeMatrix{Int}, (2, 3)) isa FixedSizeMatrix{Int}
+        @test similar(FixedSizeArray{Int}, (2, 3)) isa FixedSizeMatrix{Int}
+        @test FixedSizeArray{Int}(undef, 2, 3) isa FixedSizeMatrix{Int}
     end
 end
