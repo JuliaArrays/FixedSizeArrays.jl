@@ -33,4 +33,30 @@ using FixedSizeArrays
         @test similar(FixedSizeArray{Int}, (2, 3)) isa FixedSizeMatrix{Int}
         @test FixedSizeArray{Int}(undef, 2, 3) isa FixedSizeMatrix{Int}
     end
+
+    @testset "broadcasting" begin
+        v3 = FixedSizeArray{Int}(undef, 3)
+        @test v3 isa FixedSizeVector{Int}
+        @test (@inferred (v3  + v3)) isa FixedSizeVector{Int}
+        @test (@inferred (v3 .+ v3)) isa FixedSizeVector{Int}
+        @test (@inferred (v3 .* v3)) isa FixedSizeVector{Int}
+        @test (@inferred (v3 .+  3)) isa FixedSizeVector{Int}
+        @test (@inferred (v3 .*  3)) isa FixedSizeVector{Int}
+        @test (@inferred (v3 .+ .3)) isa FixedSizeVector{Float64}
+        @test (@inferred (v3 .* .3)) isa FixedSizeVector{Float64}
+        @testset "matrices" begin
+            m33 = FixedSizeArray{Int}(undef, 3, 3)
+            m13 = FixedSizeArray{Int}(undef, 1, 3)
+            m31 = FixedSizeArray{Int}(undef, 3, 1)
+            @test m33 isa FixedSizeMatrix{Int}
+            @test m13 isa FixedSizeMatrix{Int}
+            @test m31 isa FixedSizeMatrix{Int}
+            @test (@inferred (m33 .+ .3 )) isa FixedSizeMatrix{Float64}
+            @test (@inferred (m33 .+  3 )) isa FixedSizeMatrix{Int}
+            @test (@inferred (m33 .+ v3 )) isa FixedSizeMatrix{Int}
+            @test (@inferred (m33 .+ m13)) isa FixedSizeMatrix{Int}
+            @test (@inferred (m33 .+ m31)) isa FixedSizeMatrix{Int}
+            @test (@inferred (m33 .+ m33)) isa FixedSizeMatrix{Int}
+        end
+    end
 end

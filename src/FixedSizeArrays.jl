@@ -36,4 +36,17 @@ function Base.similar(::FixedSizeArray, ::Type{S}, size::NTuple{N,Int}) where {S
     FixedSizeArray{S,N}(undef, size...)
 end
 
+# broadcasting
+
+function Base.BroadcastStyle(::Type{<:FixedSizeArray})
+    Broadcast.ArrayStyle{FixedSizeArray}()
+end
+
+function Base.similar(
+    bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{FixedSizeArray}},
+    ::Type{E},
+) where {E}
+    similar(FixedSizeArray{E}, axes(bc))
+end
+
 end # module FixedSizeArrays
