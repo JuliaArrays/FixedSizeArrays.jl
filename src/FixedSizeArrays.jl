@@ -5,13 +5,25 @@ export FixedSizeArray, FixedSizeVector, FixedSizeMatrix
 struct FixedSizeArray{T,N} <: DenseArray{T,N}
     mem::Memory{T}
     size::NTuple{N,Int}
+    function FixedSizeArray{T,N}(mem::Memory{T}, size::NTuple{N,Int}) where {T,N}
+        new{T,N}(mem, size)
+    end
 end
 
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
+function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
+    FixedSizeArray{T,N}(Memory{T}(undef, prod(size)), size)
+end
 function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
-    return FixedSizeArray(Memory{T}(undef, prod(size)), size)
+    FixedSizeArray{T,N}(undef, size)
+end
+function FixedSizeArray{T}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
+    FixedSizeArray{T,N}(undef, size)
+end
+function FixedSizeArray{T}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
+    FixedSizeArray{T,N}(undef, size)
 end
 
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
