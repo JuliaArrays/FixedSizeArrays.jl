@@ -36,6 +36,8 @@ function Base.similar(::FixedSizeArray, ::Type{S}, size::NTuple{N,Int}) where {S
     FixedSizeArray{S,N}(undef, size...)
 end
 
+Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
+
 # broadcasting
 
 function Base.BroadcastStyle(::Type{<:FixedSizeArray})
