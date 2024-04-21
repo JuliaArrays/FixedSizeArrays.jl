@@ -91,4 +91,28 @@ using FixedSizeArrays
             @test (@inferred (m33 .+ m33)) isa FixedSizeMatrix{Int}
         end
     end
+
+    @testset "`isassigned`" begin
+        for dim_count ∈ 1:3
+            for elem_type ∈ (Int, FixedSizeMatrix{Nothing})
+                size = ntuple(Returns(3), dim_count)
+                a = FixedSizeArray{elem_type, dim_count}(undef, size)
+                for i_style ∈ (IndexLinear(), IndexCartesian())
+                    for i ∈ eachindex(i_style, a)
+                        @test isassigned(a, i) == isbitstype(elem_type)
+                    end
+                end
+            end
+            @testset "some assigned" begin
+                a = FixedSizeMatrix{FixedSizeMatrix{Nothing}}(undef, 3, 3)
+                assigned_inds = ((1, 2), (2, 3), (3, 3))
+                for ij ∈ assigned_inds
+                    a[ij...] = FixedSizeMatrix{Nothing}(undef, 1, 1)
+                end
+                for ij ∈ Iterators.product(1:3, 1:3)
+                    @test isassigned(a, ij...) == (ij ∈ assigned_inds)
+                end
+            end
+        end
+    end
 end
