@@ -16,6 +16,22 @@ using FixedSizeArrays
         @test similar(FixedSizeVector{Int}, (2,)) isa FixedSizeVector{Int}
         @test similar(FixedSizeArray{Int}, (2,)) isa FixedSizeVector{Int}
         @test FixedSizeArray{Int}(undef, 2) isa FixedSizeVector{Int}
+        for T ∈ (FixedSizeArray, FixedSizeVector)
+            a = 1:3
+            @test convert(T, a) isa FixedSizeVector{Int}
+            @test convert(T, a) == a
+            @test convert(T, convert(T, a)) isa FixedSizeVector{Int}
+            @test convert(T, convert(T, a)) == a
+        end
+        for T ∈ (FixedSizeArray{Int}, FixedSizeVector{Int})
+            for S ∈ (Int, Float64)
+                a = map(S, 1:3)
+                @test convert(T, a) isa FixedSizeVector{Int}
+                @test convert(T, a) == a
+                @test convert(T, convert(T, a)) isa FixedSizeVector{Int}
+                @test convert(T, convert(T, a)) == a
+            end
+        end
     end
 
     @testset "FixedSizeMatrix" begin
@@ -32,6 +48,22 @@ using FixedSizeArrays
         @test similar(FixedSizeMatrix{Int}, (2, 3)) isa FixedSizeMatrix{Int}
         @test similar(FixedSizeArray{Int}, (2, 3)) isa FixedSizeMatrix{Int}
         @test FixedSizeArray{Int}(undef, 2, 3) isa FixedSizeMatrix{Int}
+        for T ∈ (FixedSizeArray, FixedSizeMatrix)
+            a = reshape(1:9, (3, 3))
+            @test convert(T, a) isa FixedSizeMatrix{Int}
+            @test convert(T, a) == a
+            @test convert(T, convert(T, a)) isa FixedSizeMatrix{Int}
+            @test convert(T, convert(T, a)) == a
+        end
+        for T ∈ (FixedSizeArray{Int}, FixedSizeMatrix{Int})
+            for S ∈ (Int, Float64)
+                a = map(S, reshape(1:9, (3, 3)))
+                @test convert(T, a) isa FixedSizeMatrix{Int}
+                @test convert(T, a) == a
+                @test convert(T, convert(T, a)) isa FixedSizeMatrix{Int}
+                @test convert(T, convert(T, a)) == a
+            end
+        end
     end
 
     @testset "broadcasting" begin

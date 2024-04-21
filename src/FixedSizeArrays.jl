@@ -49,4 +49,30 @@ function Base.similar(
     similar(FixedSizeArray{E}, axes(bc))
 end
 
+# one-based indexing check
+
+axes_are_one_based(axes) = all(isone ∘ first, axes)
+
+# converting constructors for copying other array types
+
+function FixedSizeArray{T,N}(src::AbstractArray{S,N}) where {T,N,S}
+    axs = axes(src)
+    axes_are_one_based(axs) ||
+        throw(DimensionMismatch("source array has a non-one-based indexing axis"))
+    # Can't use `Base.size` because, according to it's doc string, it's not
+    # available for all `AbstractArray` types.
+    size = map(length, axs)
+    dst = FixedSizeArray{T,N}(undef, size)
+    copyto!(dst, src)::FixedSizeArray{T,N}
+end
+
+FixedSizeArray{T}(a::AbstractArray{<:Any,N})   where {T,N} = FixedSizeArray{T,N}(a)
+FixedSizeArray{<:Any,N}(a::AbstractArray{T,N}) where {T,N} = FixedSizeArray{T,N}(a)
+FixedSizeArray(a::AbstractArray{T,N})          where {T,N} = FixedSizeArray{T,N}(a)
+
+# conversion
+
+Base.convert(::Type{T}, a::T) where {T<:FixedSizeArray} = a
+Base.convert(::Type{T}, a::AbstractArray) where {T<:FixedSizeArray} = T(a)::T
+
 end # module FixedSizeArrays
