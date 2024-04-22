@@ -1,7 +1,11 @@
 using Test
 using FixedSizeArrays
+import Aqua
 
 @testset "FixedSizeArrays" begin
+    @testset "Aqua.jl" begin
+        Aqua.test_all(FixedSizeArrays)
+    end
 
     @testset "FixedSizeVector" begin
         v = FixedSizeVector{Float64}(undef, 3)
