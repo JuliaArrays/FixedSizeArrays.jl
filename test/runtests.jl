@@ -66,6 +66,18 @@ using FixedSizeArrays
         end
     end
 
+    @testset "`map`" begin
+        for dim_count ∈ 0:3
+            size = ntuple(Returns(3), dim_count)
+            a = FixedSizeArray{Int, dim_count}(undef, size)
+            for v ∈ (3, 3.1, nothing)
+                mapped = map(Returns(v), a)
+                @test all(==(v), mapped)
+                @test mapped isa FixedSizeArray{typeof(v), dim_count}
+            end
+        end
+    end
+
     @testset "broadcasting" begin
         v3 = FixedSizeArray{Int}(undef, 3)
         @test v3 isa FixedSizeVector{Int}
