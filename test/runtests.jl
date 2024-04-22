@@ -131,4 +131,22 @@ import Aqua
             end
         end
     end
+
+    @testset "`copyto!`" begin
+        for (D, S) ∈ (
+            (Memory, FixedSizeVector),
+            (FixedSizeVector, Memory),
+            (FixedSizeVector, FixedSizeVector),
+        )
+            for E ∈ (Float64, Int)
+                s = S{E}(undef, 5)
+                s .= 1:5
+                d = D{Float64}(undef, 5)
+                @test copyto!(d, s) isa D{Float64}
+                @test copyto!(d, s) == 1:5
+                @test copyto!(d, 1, s, 1, length(s)) isa D{Float64}
+                @test copyto!(d, 1, s, 1, length(s)) == 1:5
+            end
+        end
+    end
 end
