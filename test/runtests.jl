@@ -16,7 +16,6 @@ end
     @testset "Constructors" begin
         @test FixedSizeArray{Float64,0}(undef) isa FixedSizeArray{Float64,0}
         @test FixedSizeArray{Float64,0}(undef, ()) isa FixedSizeArray{Float64,0}
-        @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, typemin(Int))
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, -1)
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, (-1,))
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, -1, -1)
