@@ -43,6 +43,9 @@ Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
 checked_dims_impl(a::Int, ::Tuple{}) = a
 function checked_dims_impl(a::Int, t::Tuple{Int,Vararg{Int,N}}) where {N}
     b = first(t)
+    if (a < 0) || (b < 0)
+        throw(ArgumentError("array dimension size can't be negative"))
+    end
     (m, o) = Base.Checked.mul_with_overflow(a, b)
     o && throw(ArgumentError("array dimensions too great, can't represent length"))
     r = Base.tail(t)::NTuple{N,Int}

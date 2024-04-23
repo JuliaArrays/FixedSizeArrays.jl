@@ -17,9 +17,29 @@ end
         @test FixedSizeArray{Float64,0}(undef) isa FixedSizeArray{Float64,0}
         @test FixedSizeArray{Float64,0}(undef, ()) isa FixedSizeArray{Float64,0}
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, typemin(Int))
+        @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, -1)
+        @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, (-1,))
+        @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, -1, -1)
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, typemax(Int), typemax(Int))
         @test_throws ArgumentError FixedSizeArray{Float64,3}(undef, typemax(Int), typemax(Int), 2)
         @test_throws ArgumentError FixedSizeArray{Float64,4}(undef, typemax(Int), typemax(Int), 2, 4)
+        @testset "negative dimension size" begin
+            for n ∈ 2:4
+                funs = (
+                    Returns(-1),
+                    (i -> (i == 1) ?  1 : -1),
+                    (i -> (i == 1) ? -1 :  1),
+                    (i -> (i == n) ?  1 : -1),
+                    (i -> (i == n) ? -1 :  1),
+                )
+                fun = f -> ntuple(f, n)
+                sizes = map(fun, funs)
+                for siz ∈ sizes
+                    @test_throws ArgumentError FixedSizeArray{Float64,n}(undef, siz)
+                    @test_throws ArgumentError FixedSizeArray{Float64,n}(undef, siz...)
+                end
+            end
+        end
     end
 
     @testset "safe computation of length from dimensions size" begin
