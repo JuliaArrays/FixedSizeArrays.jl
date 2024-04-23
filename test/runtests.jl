@@ -149,4 +149,29 @@ import Aqua
             end
         end
     end
+
+    @testset "LinearAlgebra" begin
+        @testset "$T" for T in (Float16, Float32, Float64)
+            v = randn(T, 8)
+            v_fixed = FixedSizeVector(v)
+            v_sum = @inferred v_fixed + v_fixed
+            @test v_sum isa FixedSizeVector{T}
+            @test v_sum ≈ v + v
+            v_mul = @inferred v_fixed * v_fixed'
+            @test v_mul isa FixedSizeMatrix{T}
+            @test v_mul ≈ v * v'
+
+            M = randn(T, 8, 8)
+            M_fixed = FixedSizeMatrix(M)
+            M_sum = @inferred M_fixed + M_fixed
+            @test M_sum isa FixedSizeMatrix{T}
+            @test M_sum ≈ M + M
+            if T == Float16
+                # Matmul currently doesn't work for all data types
+                M_mul = @inferred M_fixed * M_fixed
+                @test M_mul isa FixedSizeMatrix{T}
+                @test M_mul ≈ M * M
+            end
+        end
+    end
 end
