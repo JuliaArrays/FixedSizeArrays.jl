@@ -2,6 +2,12 @@ using Test
 using FixedSizeArrays
 import Aqua
 
+const checked_dims = FixedSizeArrays.checked_dims
+
+function allocated(f::F, args::Vararg{Any,N}) where {F,N}
+    @allocated f(args...)
+end
+
 @testset "FixedSizeArrays" begin
     @testset "Aqua.jl" begin
         Aqua.test_all(FixedSizeArrays)
@@ -11,6 +17,18 @@ import Aqua
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, typemax(Int), typemax(Int))
         @test_throws ArgumentError FixedSizeArray{Float64,3}(undef, typemax(Int), typemax(Int), 2)
         @test_throws ArgumentError FixedSizeArray{Float64,4}(undef, typemax(Int), typemax(Int), 2, 4)
+    end
+
+    @testset "safe computation of length from dimensions size" begin
+        for n ∈ 0:30
+            t = Tuple(1:n)
+            if 20 < n
+                @test_throws ArgumentError checked_dims(t)
+            else
+                @test factorial(n) == prod(t) == @inferred checked_dims(t)
+                @test iszero(allocated(checked_dims, t))
+            end
+        end
     end
 
     @testset "FixedSizeVector" begin

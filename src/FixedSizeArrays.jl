@@ -14,7 +14,7 @@ const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
 function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
-    FixedSizeArray{T,N}(Memory{T}(undef, Core.checked_dims(size...)), size)
+    FixedSizeArray{T,N}(Memory{T}(undef, checked_dims(size)), size)
 end
 function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
     FixedSizeArray{T,N}(undef, size)
@@ -37,6 +37,24 @@ function Base.similar(::FixedSizeArray, ::Type{S}, size::NTuple{N,Int}) where {S
 end
 
 Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
+
+# safe product of a tuple of integers, for calculating dimensions size
+
+checked_dims_impl(a::Int, ::Tuple{}) = a
+function checked_dims_impl(a::Int, t::Tuple{Int,Vararg{Int,N}}) where {N}
+    b = first(t)
+    (m, o) = Base.Checked.mul_with_overflow(a, b)
+    o && throw(ArgumentError("array dimensions too great, can't represent length"))
+    r = Base.tail(t)::NTuple{N,Int}
+    checked_dims_impl(m, r)::Int
+end
+
+checked_dims(::Tuple{}) = 1
+function checked_dims(t::Tuple{Int,Vararg{Int,N}}) where {N}
+    a = first(t)
+    r = Base.tail(t)::NTuple{N,Int}
+    checked_dims_impl(a, r)::Int
+end
 
 # broadcasting
 
