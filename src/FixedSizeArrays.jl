@@ -76,6 +76,8 @@ end
 
 # helper functions
 
+parent_type(::Type{<:FixedSizeArray{T}}) where {T} = Memory{T}
+
 memory_of(m::Memory) = m
 memory_of(f::FixedSizeArray) = f.mem
 
@@ -142,5 +144,9 @@ Base.@propagate_inbounds Base.copyto!(dst::Memory        , src::FixedSizeArray) 
 # unsafe: the native address of the array's storage
 
 Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T} = Base.unsafe_convert(Ptr{T}, a.mem)
+
+# `elsize`: part of the strided arrays interface, used for `pointer`
+
+Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
 
 end # module FixedSizeArrays
