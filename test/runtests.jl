@@ -23,12 +23,12 @@ end
     end
 
     @testset "safe computation of length from dimensions size" begin
+        @test isone(checked_dims(()))
         for n ∈ 0:30
             t = Tuple(1:n)
             if 20 < n
                 @test_throws ArgumentError checked_dims(t)
             else
-                @test factorial(n) == checked_dims(t)  # redundant except for codecov
                 @test factorial(n) == prod(t) == @inferred checked_dims(t)
                 @test iszero(allocated(checked_dims, t))
             end
