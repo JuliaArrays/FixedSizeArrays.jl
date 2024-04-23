@@ -166,12 +166,9 @@ import Aqua
             M_sum = @inferred M_fixed + M_fixed
             @test M_sum isa FixedSizeMatrix{T}
             @test M_sum ≈ M + M
-            if T == Float16
-                # Matmul currently doesn't work for all data types
-                M_mul = @inferred M_fixed * M_fixed
-                @test M_mul isa FixedSizeMatrix{T}
-                @test M_mul ≈ M * M
-            end
+            M_mul = @inferred M_fixed * M_fixed
+            @test M_mul isa FixedSizeMatrix{T}
+            @test M_mul ≈ M * M
         end
     end
 end
