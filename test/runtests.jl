@@ -193,6 +193,7 @@ end
                 @test copyto!(d, s) == 1:5
                 @test copyto!(d, 1, s, 1, length(s)) isa D{Float64}
                 @test copyto!(d, 1, s, 1, length(s)) == 1:5
+                @test_throws ArgumentError copyto!(d, 1, s, 1, -1)
             end
         end
     end
