@@ -7,6 +7,12 @@ import Aqua
         Aqua.test_all(FixedSizeArrays)
     end
 
+    @testset "Constructors" begin
+        @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, typemax(Int), typemax(Int))
+        @test_throws ArgumentError FixedSizeArray{Float64,3}(undef, typemax(Int), typemax(Int), 2)
+        @test_throws ArgumentError FixedSizeArray{Float64,4}(undef, typemax(Int), typemax(Int), 2, 4)
+    end
+
     @testset "FixedSizeVector" begin
         v = FixedSizeVector{Float64}(undef, 3)
         @test length(v) == 3

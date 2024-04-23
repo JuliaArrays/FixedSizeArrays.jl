@@ -14,7 +14,7 @@ const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
 function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
-    FixedSizeArray{T,N}(Memory{T}(undef, prod(size)), size)
+    FixedSizeArray{T,N}(Memory{T}(undef, Core.checked_dims(size...)), size)
 end
 function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
     FixedSizeArray{T,N}(undef, size)
