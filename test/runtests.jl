@@ -1,5 +1,6 @@
 using Test
 using FixedSizeArrays
+using OffsetArrays: OffsetArray
 import Aqua
 
 const checked_dims = FixedSizeArrays.checked_dims
@@ -16,6 +17,14 @@ end
     @testset "Constructors" begin
         @test FixedSizeArray{Float64,0}(undef) isa FixedSizeArray{Float64,0}
         @test FixedSizeArray{Float64,0}(undef, ()) isa FixedSizeArray{Float64,0}
+        for offset ∈ (-1, 0, 2, 3)
+            ax = offset:(offset + 1)
+            oa = OffsetArray([10, 20], ax)
+            @test_throws DimensionMismatch FixedSizeArray(oa)
+            @test_throws DimensionMismatch FixedSizeVector(oa)
+            @test_throws DimensionMismatch FixedSizeArray{Int}(oa)
+            @test_throws DimensionMismatch FixedSizeVector{Int}(oa)
+        end
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, -1)
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, (-1,))
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, -1, -1)
@@ -67,20 +76,23 @@ end
         @test similar(FixedSizeVector{Int}, (2,)) isa FixedSizeVector{Int}
         @test similar(FixedSizeArray{Int}, (2,)) isa FixedSizeVector{Int}
         @test FixedSizeArray{Int}(undef, 2) isa FixedSizeVector{Int}
+        example_abstract_vectors = (7:9, [7, 8, 9], OffsetArray([7, 8, 9], 1:3))
         for T ∈ (FixedSizeArray, FixedSizeVector)
-            a = 1:3
-            @test convert(T, a) isa FixedSizeVector{Int}
-            @test convert(T, a) == a
-            @test convert(T, convert(T, a)) isa FixedSizeVector{Int}
-            @test convert(T, convert(T, a)) == a
-        end
-        for T ∈ (FixedSizeArray{Int}, FixedSizeVector{Int})
-            for S ∈ (Int, Float64)
-                a = map(S, 1:3)
+            for a ∈ example_abstract_vectors
                 @test convert(T, a) isa FixedSizeVector{Int}
                 @test convert(T, a) == a
                 @test convert(T, convert(T, a)) isa FixedSizeVector{Int}
                 @test convert(T, convert(T, a)) == a
+            end
+        end
+        for T ∈ (FixedSizeArray{Int}, FixedSizeVector{Int})
+            for S ∈ (Int, Float64)
+                for a ∈ map((c -> map(S, c)), example_abstract_vectors)
+                    @test convert(T, a) isa FixedSizeVector{Int}
+                    @test convert(T, a) == a
+                    @test convert(T, convert(T, a)) isa FixedSizeVector{Int}
+                    @test convert(T, convert(T, a)) == a
+                end
             end
         end
     end
@@ -99,20 +111,26 @@ end
         @test similar(FixedSizeMatrix{Int}, (2, 3)) isa FixedSizeMatrix{Int}
         @test similar(FixedSizeArray{Int}, (2, 3)) isa FixedSizeMatrix{Int}
         @test FixedSizeArray{Int}(undef, 2, 3) isa FixedSizeMatrix{Int}
+        example_abstract_matrices = (
+            reshape(1:9, (3, 3)),
+            OffsetArray(reshape(1:9, (3, 3)), 1:3, 1:3),
+        )
         for T ∈ (FixedSizeArray, FixedSizeMatrix)
-            a = reshape(1:9, (3, 3))
-            @test convert(T, a) isa FixedSizeMatrix{Int}
-            @test convert(T, a) == a
-            @test convert(T, convert(T, a)) isa FixedSizeMatrix{Int}
-            @test convert(T, convert(T, a)) == a
-        end
-        for T ∈ (FixedSizeArray{Int}, FixedSizeMatrix{Int})
-            for S ∈ (Int, Float64)
-                a = map(S, reshape(1:9, (3, 3)))
+            for a ∈ example_abstract_matrices
                 @test convert(T, a) isa FixedSizeMatrix{Int}
                 @test convert(T, a) == a
                 @test convert(T, convert(T, a)) isa FixedSizeMatrix{Int}
                 @test convert(T, convert(T, a)) == a
+            end
+        end
+        for T ∈ (FixedSizeArray{Int}, FixedSizeMatrix{Int})
+            for S ∈ (Int, Float64)
+                for a ∈ map((c -> map(S, c)), example_abstract_matrices)
+                    @test convert(T, a) isa FixedSizeMatrix{Int}
+                    @test convert(T, a) == a
+                    @test convert(T, convert(T, a)) isa FixedSizeMatrix{Int}
+                    @test convert(T, convert(T, a)) == a
+                end
             end
         end
     end
