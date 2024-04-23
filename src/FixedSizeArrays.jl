@@ -114,4 +114,8 @@ Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::FixedSizeArray) 
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::Memory        ) = copyto2!(dst, src)
 Base.@propagate_inbounds Base.copyto!(dst::Memory        , src::FixedSizeArray) = copyto2!(dst, src)
 
+# unsafe: the native address of the array's storage
+
+Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T} = Base.unsafe_convert(Ptr{T}, a.mem)
+
 end # module FixedSizeArrays
