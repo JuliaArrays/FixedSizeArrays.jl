@@ -14,6 +14,8 @@ end
     end
 
     @testset "Constructors" begin
+        @test FixedSizeArray{Float64,0}(undef) isa FixedSizeArray{Float64,0}
+        @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, typemin(Int))
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, typemax(Int), typemax(Int))
         @test_throws ArgumentError FixedSizeArray{Float64,3}(undef, typemax(Int), typemax(Int), 2)
         @test_throws ArgumentError FixedSizeArray{Float64,4}(undef, typemax(Int), typemax(Int), 2, 4)
