@@ -2,10 +2,17 @@ module FixedSizeArrays
 
 export FixedSizeArray, FixedSizeVector, FixedSizeMatrix
 
+"""
+    Internal()
+
+Implementation detail. Do not use.
+"""
+struct Internal end
+
 struct FixedSizeArray{T,N} <: DenseArray{T,N}
     mem::Memory{T}
     size::NTuple{N,Int}
-    function FixedSizeArray{T,N}(mem::Memory{T}, size::NTuple{N,Int}) where {T,N}
+    function FixedSizeArray{T,N}(::Internal, mem::Memory{T}, size::NTuple{N,Int}) where {T,N}
         new{T,N}(mem, size)
     end
 end
@@ -14,7 +21,7 @@ const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
 function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
-    FixedSizeArray{T,N}(Memory{T}(undef, checked_dims(size)), size)
+    FixedSizeArray{T,N}(Internal(), Memory{T}(undef, checked_dims(size)), size)
 end
 function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
     FixedSizeArray{T,N}(undef, size)
