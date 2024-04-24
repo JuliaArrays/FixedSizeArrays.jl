@@ -47,7 +47,9 @@ function checked_dims_impl(a::Int, t::Tuple{Int,Vararg{Int,N}}) where {N}
         throw(ArgumentError("array dimension size can't be negative"))
     end
     (m, o) = Base.Checked.mul_with_overflow(a, b)
-    o && throw(ArgumentError("array dimensions too great, can't represent length"))
+    if o
+        throw(ArgumentError("array dimensions too great, can't represent length"))
+    end
     r = Base.tail(t)::NTuple{N,Int}
     checked_dims_impl(m, r)::Int
 end
@@ -85,8 +87,9 @@ axes_are_one_based(axes) = all(isone ∘ first, axes)
 
 function FixedSizeArray{T,N}(src::AbstractArray{S,N}) where {T,N,S}
     axs = axes(src)
-    axes_are_one_based(axs) ||
+    if !axes_are_one_based(axs)
         throw(DimensionMismatch("source array has a non-one-based indexing axis"))
+    end
     # Can't use `Base.size` because, according to it's doc string, it's not
     # available for all `AbstractArray` types.
     size = map(length, axs)
@@ -107,8 +110,9 @@ Base.convert(::Type{T}, a::AbstractArray) where {T<:FixedSizeArray} = T(a)::T
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)
     if !iszero(n)
-        (n < false) &&
+        if n < false
             throw(ArgumentError("the number of elements to copy must be nonnegative"))
+        end
         @boundscheck checkbounds(dst, doff:doff+n-1)
         @boundscheck checkbounds(src, soff:soff+n-1)
         @inbounds let d, s
