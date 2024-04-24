@@ -237,4 +237,18 @@ end
             @test M_mul ≈ M * M
         end
     end
+
+    @testset "`pointer`" begin
+        for elem_type ∈ (Int8, Int16, Int32, Int64)
+            for dim_count ∈ 0:4
+                siz = ntuple(Returns(2), dim_count)
+                arr = FixedSizeArray{elem_type, dim_count}(undef, siz)
+                @test pointer(arr) === pointer(arr, 1) === pointer(arr, 2) - sizeof(elem_type)
+                @test (@inferred pointer(arr))    isa Ptr{elem_type}
+                @test (@inferred pointer(arr, 1)) isa Ptr{elem_type}
+                @test iszero(allocated(pointer, arr))
+                @test iszero(allocated(pointer, arr, 1))
+            end
+        end
+    end
 end
