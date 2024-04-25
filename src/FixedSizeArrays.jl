@@ -160,4 +160,14 @@ Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T} = Base.unsaf
 
 Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
 
+# `reshape`: specializing it to ensure it returns a `FixedSizeArray`
+
+function Base.reshape(a::FixedSizeArray{T}, size::NTuple{N,Int}) where {T,N}
+    len = checked_dims(size)
+    if length(a) != len
+        throw(DimensionMismatch("new shape not consistent with existing array length"))
+    end
+    FixedSizeArray{T,N}(Internal(), a.mem, size)
+end
+
 end # module FixedSizeArrays
