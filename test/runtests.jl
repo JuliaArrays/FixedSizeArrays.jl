@@ -301,4 +301,36 @@ end
             end
         end
     end
+
+    @testset "`reshape`" begin
+        length_to_shapes = Dict(
+            (0 => ((0,), (0, 0), (0, 1), (1, 0), (1, 0, 0), (0, 0, 1))),
+            (1 => ((), (1,), (1, 1), (1, 1, 1))),
+            (2 => ((2,), (1, 2), (2, 1), (1, 2, 1))),
+            (3 => ((3,), (1, 3), (3, 1), (1, 3, 1))),
+            (4 => ((4,), (1, 4), (4, 1), (2, 2), (1, 2, 2), (2, 1, 2))),
+            (6 => ((6,), (1, 6), (6, 1), (2, 3), (3, 2), (1, 3, 2), (2, 1, 3))),
+        )
+        for elem_type ∈ (Int, Number, Union{Nothing,Int})
+            for len ∈ keys(length_to_shapes)
+                shapes = length_to_shapes[len]
+                for shape1 ∈ shapes
+                    a = FixedSizeArray{elem_type,length(shape1)}(undef, shape1)
+                    @test_throws DimensionMismatch reshape(a, length(a)+1)
+                    @test_throws DimensionMismatch reshape(a, length(a)+1, 1)
+                    @test_throws DimensionMismatch reshape(a, 1, length(a)+1)
+                    for shape2 ∈ shapes
+                        @test prod(shape1) === prod(shape2) === len  # meta
+                        T = FixedSizeArray{elem_type,length(shape2)}
+                        test_inferred_noalloc(reshape, T, (a, shape2))
+                        test_inferred_noalloc(reshape, T, (a, shape2...))
+                        b = reshape(a, shape2)
+                        @test size(b) === shape2
+                        @test a.mem === b.mem
+                        @test a === reshape(b, shape1)
+                    end
+                end
+            end
+        end
+    end
 end
