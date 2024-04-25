@@ -50,6 +50,10 @@ Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
 checked_dims_impl(a::Int, ::Tuple{}) = a
 function checked_dims_impl(a::Int, t::Tuple{Int,Vararg{Int,N}}) where {N}
     b = first(t)
+    tmax = typemax(a)
+    if (a == tmax) || (b == tmax)
+        throw(ArgumentError("array dimension size can't be the maximum representable value"))
+    end
     if (a < 0) || (b < 0)
         throw(ArgumentError("array dimension size can't be negative"))
     end
