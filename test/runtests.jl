@@ -11,9 +11,15 @@ allocated(f::F,      args::Tuple) where {F} = @allocated f(args...)
 allocated(::Type{T}, args::Tuple) where {T} = @allocated T(args...)
 test_noalloc(f::F,      args::Tuple) where {F} = @test iszero(allocated(f, args))
 test_noalloc(::Type{T}, args::Tuple) where {T} = @test iszero(allocated(T, args))
-test_inferred(f::F,      ::Type{R}, args::Tuple) where {F,R} = @test (@inferred f(args...)) isa R
-test_inferred(::Type{T}, ::Type{R}, args::Tuple) where {T,R} = @test (@inferred T(args...)) isa R
-test_inferred(::Type{T},            args::Tuple) where {T  } = test_inferred(T, T, args)
+function test_inferred(f::F,      ::Type{R}, args::Tuple) where {F,R}
+    @test isconcretetype(R)  # meta: test-strictness test
+    @test (@inferred f(args...)) isa R
+end
+function test_inferred(::Type{T}, ::Type{R}, args::Tuple) where {T,R}
+    @test isconcretetype(R)  # meta: test-strictness test
+    @test (@inferred T(args...)) isa R
+end
+test_inferred(::Type{T}, args::Tuple) where {T} = test_inferred(T, T, args)
 function test_inferred_noalloc(f::F,      ::Type{R}, args::Tuple) where {F,R}
     test_noalloc(f, args)
     test_inferred(f, R, args)
