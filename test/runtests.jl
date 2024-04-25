@@ -57,9 +57,10 @@ end
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, -1)
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, (-1,))
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, -1, -1)
+        @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, typemax(Int), 0)
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, typemax(Int), typemax(Int))
-        @test_throws ArgumentError FixedSizeArray{Float64,3}(undef, typemax(Int), typemax(Int), 2)
-        @test_throws ArgumentError FixedSizeArray{Float64,4}(undef, typemax(Int), typemax(Int), 2, 4)
+        @test_throws ArgumentError FixedSizeArray{Float64,3}(undef, typemax(Int)-1, typemax(Int)-1, 2)
+        @test_throws ArgumentError FixedSizeArray{Float64,4}(undef, typemax(Int)-1, typemax(Int)-1, 2, 4)
         @testset "negative dimension size" begin
             for n ∈ 2:4
                 funs = (
