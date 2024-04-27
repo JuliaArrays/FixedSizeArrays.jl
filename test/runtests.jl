@@ -62,7 +62,7 @@ end
         end
         @testset "taken from Julia's test/core.jl" begin
             # inspired by:
-            # https://github.com/JuliaLang/julia/blob/master/test/core.jl#L7211-L7228
+            # https://github.com/JuliaLang/julia/blob/83929ad883c97fa4376618c4559b74f6ada7a3ce/test/core.jl#L7211-L7228
             b = prevpow(2, typemax(Int))
             test_inferred(FixedSizeArray{Int}, FixedSizeArray{Int,3}, (undef, 0, b, b))
             test_inferred(FixedSizeArray{Int}, FixedSizeArray{Int,3}, (undef, b, b, 0))
