@@ -4,6 +4,7 @@ using OffsetArrays: OffsetArray
 import Aqua
 
 const checked_dims = FixedSizeArrays.checked_dims
+const collect_as = FixedSizeArrays.collect_as
 
 # helpers for testing for allocation or suboptimal inference
 
@@ -348,6 +349,52 @@ end
                         @test a === reshape(b, shape1)
                     end
                 end
+            end
+        end
+    end
+
+    @testset "`collect_as`" begin
+        for T ∈ (FixedSizeArray, FixedSizeVector, FixedSizeArray{Int}, FixedSizeVector{Int})
+            for iterator ∈ (Iterators.repeated(7), Iterators.cycle(7))
+                @test_throws ArgumentError collect_as(T, iterator)
+            end
+        end
+        for T ∈ (FixedSizeArray{<:Any,-1}, FixedSizeArray{Int,-1}, FixedSizeArray{Int,3.1})
+            iterator = (7:8, (7, 8))
+            @test_throws ArgumentError collect_as(T, iterator)
+        end
+        for T ∈ (FixedSizeArray{3}, FixedSizeVector{3})
+            iterator = (7:8, (7, 8))
+            @test_throws TypeError collect_as(T, iterator)
+        end
+        iterators = (
+            (), (7,), (7, 8), 7, (7 => 8), Ref(7), fill(7),
+            (i for i ∈ 1:3), ((i + 100*j) for i ∈ 1:3, j ∈ 1:2), Iterators.repeated(7, 2),
+            (i for i ∈ 7:9 if i==8), 7:8, 8:7, Int[], [7], [7 8],
+        )
+        abstract_array_params(::AbstractArray{T,N}) where {T,N} = (T, N)
+        @testset "iterator: $iterator" for iterator ∈ iterators
+            a = collect(iterator)
+            (E, dim_count) = abstract_array_params(a)
+            af = collect(Float64, iterator)
+            @test abstract_array_params(af) == (Float64, dim_count)  # meta
+            @test_throws MethodError collect_as(FixedSizeArray{E,dim_count+1}, iterator)
+            for T ∈ (FixedSizeArray, FixedSizeArray{<:Any,dim_count})
+                @test a == collect_as(T, iterator)
+                fsa = collect_as(T, iterator)
+                @test first(abstract_array_params(fsa)) <: E
+            end
+            for T ∈ (FixedSizeArray{E}, FixedSizeArray{E,dim_count})
+                @test a == collect_as(T, iterator)
+                test_inferred(collect_as, FixedSizeArray{E,dim_count}, (T, iterator))
+                fsa = collect_as(T, iterator)
+                @test first(abstract_array_params(fsa)) <: E
+            end
+            for T ∈ (FixedSizeArray{Float64}, FixedSizeArray{Float64,dim_count})
+                @test af == collect_as(T, iterator)
+                test_inferred(collect_as, FixedSizeArray{Float64,dim_count}, (T, iterator))
+                fsa = collect_as(T, iterator)
+                @test first(abstract_array_params(fsa)) <: Float64
             end
         end
     end

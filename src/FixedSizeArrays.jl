@@ -2,6 +2,8 @@ module FixedSizeArrays
 
 export FixedSizeArray, FixedSizeVector, FixedSizeMatrix
 
+public collect_as
+
 """
     Internal()
 
@@ -94,6 +96,56 @@ end
 
 # helper functions
 
+dimension_count_of(::Base.SizeUnknown) = 1
+dimension_count_of(::Base.HasLength) = 1
+dimension_count_of(::Base.HasShape{N}) where {N} = convert(Int, N)::Int
+
+struct LengthIsUnknown end
+struct LengthIsKnown end
+length_status(::Base.SizeUnknown) = LengthIsUnknown()
+length_status(::Base.HasLength) = LengthIsKnown()
+length_status(::Base.HasShape) = LengthIsKnown()
+
+function check_count_value(n::Int)
+    if n < 0
+        throw(ArgumentError("count can't be negative"))
+    end
+    nothing
+end
+function check_count_value(n)
+    throw(ArgumentError("count must be an `Int`"))
+end
+
+struct SpecFSA{T,N} end
+function fsa_spec_to_type(::SpecFSA{nothing,nothing})
+    FixedSizeArray
+end
+function fsa_spec_to_type(::SpecFSA{nothing,M}) where {M}
+    check_count_value(M)
+    FixedSizeArray{<:Any,M}
+end
+function fsa_spec_to_type(::SpecFSA{E,nothing}) where {E}
+    FixedSizeArray{E::Type}
+end
+function fsa_spec_to_type(::SpecFSA{E,M}) where {E,M}
+    check_count_value(M)
+    FixedSizeArray{E::Type,M}
+end
+function fsa_spec_from_type(::Type{FixedSizeArray})
+    SpecFSA{nothing,nothing}()
+end
+function fsa_spec_from_type(::Type{FixedSizeArray{<:Any,M}}) where {M}
+    check_count_value(M)
+    SpecFSA{nothing,M}()
+end
+function fsa_spec_from_type(::Type{FixedSizeArray{E}}) where {E}
+    SpecFSA{E::Type,nothing}()
+end
+function fsa_spec_from_type(::Type{FixedSizeArray{E,M}}) where {E,M}
+    check_count_value(M)
+    SpecFSA{E::Type,M}()
+end
+
 parent_type(::Type{<:FixedSizeArray{T}}) where {T} = Memory{T}
 
 memory_of(m::Memory) = m
@@ -175,6 +227,128 @@ function Base.reshape(a::FixedSizeArray{T}, size::NTuple{N,Int}) where {T,N}
         throw(DimensionMismatch("new shape not consistent with existing array length"))
     end
     FixedSizeArray{T,N}(Internal(), a.mem, size)
+end
+
+# `collect_as`
+
+function collect_as_fsa0(iterator, ::Val{nothing})
+    x = only(iterator)
+    ret = FixedSizeArray{typeof(x),0}(undef)
+    ret[] = x
+    ret
+end
+
+function collect_as_fsa0(iterator, ::Val{E}) where {E}
+    E::Type
+    x = only(iterator)
+    ret = FixedSizeArray{E,0}(undef)
+    ret[] = x
+    ret
+end
+
+function fill_fsa_from_iterator!(a, iterator)
+    actual_count = 0
+    for e ∈ iterator
+        actual_count += 1
+        a[actual_count] = e
+    end
+    if actual_count != length(a)
+        throw(ArgumentError("`size`-`length` inconsistency"))
+    end
+    nothing
+end
+
+function collect_as_fsam_with_shape(
+    iterator, ::SpecFSA{nothing,M}, shape::Tuple{Vararg{Int}},
+) where {M}
+    E = eltype(iterator)::Type
+    ret = FixedSizeArray{E,M}(undef, shape)
+    fill_fsa_from_iterator!(ret, iterator)
+    map(identity, ret)::FixedSizeArray{<:Any,M}
+end
+
+function collect_as_fsam_with_shape(
+    iterator, ::SpecFSA{E,M}, shape::Tuple{Vararg{Int}},
+) where {E,M}
+    E::Type
+    ret = FixedSizeArray{E,M}(undef, shape)
+    fill_fsa_from_iterator!(ret, iterator)
+    ret::FixedSizeArray{E,M}
+end
+
+function collect_as_fsam(iterator, spec::SpecFSA{<:Any,M}) where {M}
+    check_count_value(M)
+    shape = if isone(M)
+        (length(iterator),)
+    else
+        size(iterator)
+    end::NTuple{M,Any}
+    shap = map(Int, shape)::NTuple{M,Int}
+    collect_as_fsam_with_shape(iterator, spec, shap)::FixedSizeArray{<:Any,M}
+end
+
+function collect_as_fsa1_from_unknown_length(iterator, ::Val{nothing})
+    v = collect(iterator)::AbstractVector
+    T = FixedSizeVector
+    map(identity, T(v))::T
+end
+
+function collect_as_fsa1_from_unknown_length(iterator, ::Val{E}) where {E}
+    E::Type
+    v = collect(E, iterator)::AbstractVector{E}
+    T = FixedSizeVector{E}
+    T(v)::T
+end
+
+function collect_as_fsa_impl(iterator, ::SpecFSA{E,0}, ::LengthIsKnown) where {E}
+    collect_as_fsa0(iterator, Val(E))::FixedSizeArray{<:Any,0}
+end
+
+function collect_as_fsa_impl(iterator, spec::SpecFSA, ::LengthIsKnown)
+    collect_as_fsam(iterator, spec)::FixedSizeArray
+end
+
+function collect_as_fsa_impl(iterator, ::SpecFSA{E,1}, ::LengthIsUnknown) where {E}
+    collect_as_fsa1_from_unknown_length(iterator, Val(E))::FixedSizeVector
+end
+
+function collect_as_fsa_checked(iterator, ::SpecFSA{E,nothing}, ::Val{M}, length_status) where {E,M}
+    check_count_value(M)
+    collect_as_fsa_impl(iterator, SpecFSA{E,M}(), length_status)::FixedSizeArray{<:Any,M}
+end
+
+function collect_as_fsa_checked(iterator, ::SpecFSA{E,M}, ::Val{M}, length_status) where {E,M}
+    check_count_value(M)
+    collect_as_fsa_impl(iterator, SpecFSA{E,M}(), length_status)::FixedSizeArray{<:Any,M}
+end
+
+function collect_as_fsa(iterator, spec::SpecFSA)
+    size_class = Base.IteratorSize(iterator)
+    if size_class == Base.IsInfinite()
+        throw(ArgumentError("iterator is infinite, can't fit infinitely many elements into a `FixedSizeArray`"))
+    end
+    dim_count_int = dimension_count_of(size_class)
+    check_count_value(dim_count_int)
+    dim_count = Val(dim_count_int)::Val
+    len_stat = length_status(size_class)
+    R = fsa_spec_to_type(spec)::Type{<:FixedSizeArray}
+    collect_as_fsa_checked(iterator, spec, dim_count, len_stat)::R
+end
+
+function collect_as_fsa(a::AbstractArray, spec::SpecFSA)
+    R = fsa_spec_to_type(spec)::Type{<:FixedSizeArray}
+    R(a)::R
+end
+
+"""
+    collect_as(t::Type{<:FixedSizeArray}, iterator)
+
+Tries to construct a value of type `t` from the iterator `iterator`. The type `t`
+must either be concrete, or a `UnionAll` without constraints.
+"""
+function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
+    spec = fsa_spec_from_type(T)::SpecFSA
+    collect_as_fsa(iterator, spec)::T
 end
 
 end # module FixedSizeArrays
