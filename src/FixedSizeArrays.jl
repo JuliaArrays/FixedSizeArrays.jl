@@ -40,7 +40,7 @@ Base.@propagate_inbounds Base.setindex!(A::FixedSizeArray, v, i::Int) = A.mem[i]
 Base.size(a::FixedSizeArray) = getfield(a, :size)
 
 function Base.similar(::FixedSizeArray, ::Type{S}, size::NTuple{N,Int}) where {S,N}
-    FixedSizeArray{S,N}(undef, size...)
+    FixedSizeArray{S,N}(undef, size)
 end
 
 Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
