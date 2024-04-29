@@ -37,7 +37,7 @@ Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
 Base.@propagate_inbounds Base.getindex(A::FixedSizeArray, i::Int) = A.mem[i]
 Base.@propagate_inbounds Base.setindex!(A::FixedSizeArray, v, i::Int) = A.mem[i] = v
 
-Base.size(a::FixedSizeArray) = getfield(a, :size)
+Base.size(a::FixedSizeArray) = a.size
 
 function Base.similar(::FixedSizeArray, ::Type{S}, size::NTuple{N,Int}) where {S,N}
     FixedSizeArray{S,N}(undef, size...)
