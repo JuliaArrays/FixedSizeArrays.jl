@@ -60,6 +60,22 @@ end
             @test_throws DimensionMismatch FixedSizeArray{Int}(oa)
             @test_throws DimensionMismatch FixedSizeVector{Int}(oa)
         end
+        @testset "taken from Julia's test/core.jl" begin
+            # inspired by:
+            # https://github.com/JuliaLang/julia/blob/83929ad883c97fa4376618c4559b74f6ada7a3ce/test/core.jl#L7211-L7228
+            b = prevpow(2, typemax(Int))
+            test_inferred(FixedSizeArray{Int}, FixedSizeArray{Int,3}, (undef, 0, b, b))
+            test_inferred(FixedSizeArray{Int}, FixedSizeArray{Int,3}, (undef, b, b, 0))
+            test_inferred(FixedSizeArray{Int}, FixedSizeArray{Int,5}, (undef, b, b, 0, b, b))
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, b, b)
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, 1, b, b)
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, 0, -10)
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, -10, 0)
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, -1, -1)
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, 0, -4, -4)
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, -4, 1, 0)
+            @test_throws ArgumentError FixedSizeArray{Int}(undef, -4, -4, 1)
+        end
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, -1)
         @test_throws ArgumentError FixedSizeArray{Float64,1}(undef, (-1,))
         @test_throws ArgumentError FixedSizeArray{Float64,2}(undef, -1, -1)
