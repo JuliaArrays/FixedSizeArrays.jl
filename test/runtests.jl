@@ -47,9 +47,11 @@ end
             siz = ntuple(Returns(2), dim_count)
             T = FixedSizeArray{Float64}
             R = FixedSizeArray{Float64,dim_count}
-            for args ∈ ((undef, siz), (undef, siz...))
-                test_inferred(   R, args)
-                test_inferred(T, R, args)
+            for sz ∈ (siz, map(BigInt, siz))
+                for args ∈ ((undef, sz), (undef, sz...))
+                    test_inferred(   R, args)
+                    test_inferred(T, R, args)
+                end
             end
         end
         for offset ∈ (-1, 0, 2, 3)
