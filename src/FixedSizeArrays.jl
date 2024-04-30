@@ -335,11 +335,6 @@ function collect_as_fsa(iterator, spec::SpecFSA)
     collect_as_fsa_checked(iterator, spec, dim_count, len_stat)::R
 end
 
-function collect_as_fsa(a::AbstractArray, spec::SpecFSA)
-    R = fsa_spec_to_type(spec)::Type{<:FixedSizeArray}
-    R(a)::R
-end
-
 """
     collect_as(t::Type{<:FixedSizeArray}, iterator)
 
