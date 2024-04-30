@@ -370,7 +370,7 @@ end
         iterators = (
             (), (7,), (7, 8), 7, (7 => 8), Ref(7), fill(7),
             (i for i ∈ 1:3), ((i + 100*j) for i ∈ 1:3, j ∈ 1:2), Iterators.repeated(7, 2),
-            (i for i ∈ 7:9 if i==8), 7:8, 8:7, Int[], [7], [7 8],
+            (i for i ∈ 7:9 if i==8), 7:8, 8:7, map(BigInt, 7:8), Int[], [7], [7 8],
         )
         abstract_array_params(::AbstractArray{T,N}) where {T,N} = (T, N)
         @testset "iterator: $iterator" for iterator ∈ iterators
