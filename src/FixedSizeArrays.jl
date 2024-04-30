@@ -23,13 +23,17 @@ const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
     FixedSizeArray{T,N}(Internal(), Memory{T}(undef, checked_dims(size)), size)
 end
-function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
+function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N}
+    ints = map(Int, size)::NTuple{N,Int}  # prevent infinite recursion
+    FixedSizeArray{T,N}(undef, ints)
+end
+function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N}
     FixedSizeArray{T,N}(undef, size)
 end
-function FixedSizeArray{T}(::UndefInitializer, size::Vararg{Int,N}) where {T,N}
+function FixedSizeArray{T}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N}
     FixedSizeArray{T,N}(undef, size)
 end
-function FixedSizeArray{T}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
+function FixedSizeArray{T}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N}
     FixedSizeArray{T,N}(undef, size)
 end
 
