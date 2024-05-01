@@ -68,8 +68,46 @@ end
         end
     end
 
-    storage_types = (Memory, Vector, fsv(Memory), fsv(Vector), fsv(fsv(Memory)))
-    for storage_type ∈ storage_types
+    struct Iter{E,N,I<:Integer}
+        size::NTuple{N,I}
+        length::I
+        val::E
+    end
+    function Base.iterate(i::Iter)
+        l = i.length
+        iterate(i, max(zero(l), l))
+    end
+    function Base.iterate(i::Iter, state::Int)
+        if iszero(state)
+            nothing
+        else
+            (i.val, state - 1)
+        end
+    end
+    Base.IteratorSize(::Type{<:Iter{<:Any,N}}) where {N} = Base.HasShape{N}()
+    Base.length(i::Iter) = i.length
+    Base.size(i::Iter) = i.size
+    Base.eltype(::Type{<:Iter{E}}) where {E} = E
+
+    @testset "default underlying storage type" begin
+        default = FixedSizeArrays.default_underlying_storage_type
+        return_type = FixedSizeVector{Int,default{Int}}
+        test_inferred(FixedSizeArray{Int}, return_type, (undef, 3))
+        test_inferred(FixedSizeArray{Int}, return_type, (undef, (3,)))
+        test_inferred(FixedSizeVector{Int}, return_type, (undef, 3))
+        test_inferred(FixedSizeVector{Int}, return_type, (undef, (3,)))
+        iter = (i for i ∈ 1:3)
+        @test collect_as(FixedSizeArray, iter) isa return_type
+        test_inferred(collect_as, return_type, (FixedSizeArray{Int}, iter))
+        test_inferred(collect_as, return_type, (FixedSizeVector{Int}, iter))
+        arr = ([1, 2, 3],)
+        test_inferred(FixedSizeArray, return_type, arr)
+        test_inferred(FixedSizeVector, return_type, arr)
+        test_inferred(FixedSizeArray{Int}, return_type, arr)
+        test_inferred(FixedSizeVector{Int}, return_type, arr)
+    end
+
+    for storage_type ∈ (Memory,)
         FSV = fsv(storage_type)
         FSM = fsm(storage_type)
         FSA = fsa(storage_type)
@@ -89,8 +127,6 @@ end
             for offset ∈ (-1, 0, 2, 3)
                 ax = offset:(offset + 1)
                 oa = OffsetArray([10, 20], ax)
-                @test_throws DimensionMismatch FSA(oa)
-                @test_throws DimensionMismatch FSV(oa)
                 @test_throws DimensionMismatch FSA{Int}(oa)
                 @test_throws DimensionMismatch FSV{Int}(oa)
             end
@@ -155,11 +191,6 @@ end
                 @test c == a
                 @test c === convert(T, c)
             end
-            for T ∈ (FSA, FSV)
-                for a ∈ example_abstract_vectors
-                    test_convert(T, a)
-                end
-            end
             for T ∈ (FSA{Int}, FSV{Int})
                 for S ∈ (Int, Float64)
                     for a ∈ map((c -> map(S, c)), example_abstract_vectors)
@@ -191,11 +222,6 @@ end
                 test_inferred(convert, FSM{Int}, (T, c))
                 @test c == a
                 @test c === convert(T, c)
-            end
-            for T ∈ (FSA, FSM)
-                for a ∈ example_abstract_matrices
-                    test_convert(T, a)
-                end
             end
             for T ∈ (FSA{Int}, FSM{Int})
                 for S ∈ (Int, Float64)
@@ -310,7 +336,7 @@ end
         @testset "LinearAlgebra" begin
             @testset "$T" for T in (Float16, Float32, Float64)
                 v = randn(T, 8)
-                v_fixed = FSV(v)
+                v_fixed = FSV{T}(v)
                 test_inferred(+, FSV{T}, (v_fixed, v_fixed))
                 v_sum = v_fixed + v_fixed
                 @test v_sum ≈ v + v
@@ -319,7 +345,7 @@ end
                 @test v_mul ≈ v * v'
 
                 M = randn(T, 8, 8)
-                M_fixed = FSM(M)
+                M_fixed = FSM{T}(M)
                 test_inferred(+, FSM{T}, (M_fixed, M_fixed))
                 M_sum = M_fixed + M_fixed
                 @test M_sum ≈ M + M
@@ -374,12 +400,12 @@ end
         end
 
         @testset "`collect_as`" begin
-            for T ∈ (FSA, FSV, FSA{Int}, FSV{Int})
+            for T ∈ (FSA{Int}, FSV{Int})
                 for iterator ∈ (Iterators.repeated(7), Iterators.cycle(7))
                     @test_throws ArgumentError collect_as(T, iterator)
                 end
             end
-            for T ∈ (FSA{<:Any,-1}, FSA{Int,-1}, FSA{Int,3.1})
+            for T ∈ (FSA{Int,-1}, FSA{Int,3.1})
                 iterator = (7:8, (7, 8))
                 @test_throws ArgumentError collect_as(T, iterator)
             end
@@ -387,31 +413,11 @@ end
                 iterator = (7:8, (7, 8))
                 @test_throws TypeError collect_as(T, iterator)
             end
-            struct Iter{E,N,I<:Integer}
-                size::NTuple{N,I}
-                length::I
-                val::E
-            end
-            function Base.iterate(i::Iter)
-                l = i.length
-                iterate(i, max(zero(l), l))
-            end
-            function Base.iterate(i::Iter, state::Int)
-                if iszero(state)
-                    nothing
-                else
-                    (i.val, state - 1)
-                end
-            end
-            Base.IteratorSize(::Type{<:Iter{<:Any,N}}) where {N} = Base.HasShape{N}()
-            Base.length(i::Iter) = i.length
-            Base.size(i::Iter) = i.size
-            Base.eltype(::Type{<:Iter{E}}) where {E} = E
             @testset "buggy iterator with mismatched `size` and `length" begin
                 for iterator ∈ (Iter((), 0, 7), Iter((3, 2), 5, 7))
                     E = eltype(iterator)
                     dim_count = length(size(iterator))
-                    for T ∈ (FSA, FSA{E}, FSA{<:Any,dim_count}, FSA{E,dim_count})
+                    for T ∈ (FSA{E}, FSA{E,dim_count})
                         @test_throws ArgumentError collect_as(T, iterator)
                     end
                 end
@@ -429,13 +435,14 @@ end
                 af = collect(Float64, iterator)
                 @test abstract_array_params(af) == (Float64, dim_count)  # meta
                 @test_throws MethodError collect_as(FSA{E,dim_count+1}, iterator)
-                for T ∈ (FSA, FSA{<:Any,dim_count})
+                for T ∈ (FSA{E}, FSA{E,dim_count})
+                    test_inferred(collect_as, FSA{E,dim_count}, (T, iterator))
                     fsa = collect_as(T, iterator)
                     @test a == fsa
                     @test first(abstract_array_params(fsa)) <: E
                 end
-                for T ∈ (FSA{E}, FSA{E,dim_count})
-                    test_inferred(collect_as, FSA{E,dim_count}, (T, iterator))
+                for T ∈ (FSA, FSA{<:Any,dim_count}, FixedSizeArray{<:Any,dim_count})
+                    @test collect_as(T, iterator) isa FSA{E,dim_count}
                     fsa = collect_as(T, iterator)
                     @test a == fsa
                     @test first(abstract_array_params(fsa)) <: E
