@@ -4,6 +4,7 @@ using OffsetArrays: OffsetArray
 import Aqua
 
 const checked_dims = FixedSizeArrays.checked_dims
+const collect_as = FixedSizeArrays.collect_as
 
 # helpers for testing for allocation or suboptimal inference
 
@@ -350,6 +351,82 @@ end
                         @test a === reshape(b, shape1)
                     end
                 end
+            end
+        end
+    end
+
+    @testset "`collect_as`" begin
+        for T ∈ (FixedSizeArray, FixedSizeVector, FixedSizeArray{Int}, FixedSizeVector{Int})
+            for iterator ∈ (Iterators.repeated(7), Iterators.cycle(7))
+                @test_throws ArgumentError collect_as(T, iterator)
+            end
+        end
+        for T ∈ (FixedSizeArray{<:Any,-1}, FixedSizeArray{Int,-1}, FixedSizeArray{Int,3.1})
+            iterator = (7:8, (7, 8))
+            @test_throws ArgumentError collect_as(T, iterator)
+        end
+        for T ∈ (FixedSizeArray{3}, FixedSizeVector{3})
+            iterator = (7:8, (7, 8))
+            @test_throws TypeError collect_as(T, iterator)
+        end
+        struct Iter{E,N,I<:Integer}
+            size::NTuple{N,I}
+            length::I
+            val::E
+        end
+        function Base.iterate(i::Iter)
+            l = i.length
+            iterate(i, max(zero(l), l))
+        end
+        function Base.iterate(i::Iter, state::Int)
+            if iszero(state)
+                nothing
+            else
+                (i.val, state - 1)
+            end
+        end
+        Base.IteratorSize(::Type{<:Iter{<:Any,N}}) where {N} = Base.HasShape{N}()
+        Base.length(i::Iter) = i.length
+        Base.size(i::Iter) = i.size
+        Base.eltype(::Type{<:Iter{E}}) where {E} = E
+        @testset "buggy iterator with mismatched `size` and `length" begin
+            for iterator ∈ (Iter((), 0, 7), Iter((3, 2), 5, 7))
+                E = eltype(iterator)
+                dim_count = length(size(iterator))
+                for T ∈ (FixedSizeArray, FixedSizeArray{E}, FixedSizeArray{<:Any,dim_count}, FixedSizeArray{E,dim_count})
+                    @test_throws ArgumentError collect_as(T, iterator)
+                end
+            end
+        end
+        iterators = (
+            (), (7,), (7, 8), 7, (7 => 8), Ref(7), fill(7),
+            (i for i ∈ 1:3), ((i + 100*j) for i ∈ 1:3, j ∈ 1:2), Iterators.repeated(7, 2),
+            (i for i ∈ 7:9 if i==8), 7:8, 8:7, map(BigInt, 7:8), Int[], [7], [7 8],
+            Iter((), 1, 7), Iter((3,), 3, 7), Iter((3, 2), 6, 7),
+        )
+        abstract_array_params(::AbstractArray{T,N}) where {T,N} = (T, N)
+        @testset "iterator: $iterator" for iterator ∈ iterators
+            a = collect(iterator)
+            (E, dim_count) = abstract_array_params(a)
+            af = collect(Float64, iterator)
+            @test abstract_array_params(af) == (Float64, dim_count)  # meta
+            @test_throws MethodError collect_as(FixedSizeArray{E,dim_count+1}, iterator)
+            for T ∈ (FixedSizeArray, FixedSizeArray{<:Any,dim_count})
+                fsa = collect_as(T, iterator)
+                @test a == fsa
+                @test first(abstract_array_params(fsa)) <: E
+            end
+            for T ∈ (FixedSizeArray{E}, FixedSizeArray{E,dim_count})
+                test_inferred(collect_as, FixedSizeArray{E,dim_count}, (T, iterator))
+                fsa = collect_as(T, iterator)
+                @test a == fsa
+                @test first(abstract_array_params(fsa)) <: E
+            end
+            for T ∈ (FixedSizeArray{Float64}, FixedSizeArray{Float64,dim_count})
+                test_inferred(collect_as, FixedSizeArray{Float64,dim_count}, (T, iterator))
+                fsa = collect_as(T, iterator)
+                @test af == fsa
+                @test first(abstract_array_params(fsa)) <: Float64
             end
         end
     end
