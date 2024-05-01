@@ -96,8 +96,8 @@ end
 
 parent_type(::Type{<:FixedSizeArray{T}}) where {T} = Memory{T}
 
-memory_of(m) = m
-memory_of(f::FixedSizeArray) = f.mem
+underlying_storage(m) = m
+underlying_storage(f::FixedSizeArray) = f.mem
 
 first_linear_index(a) = first(eachindex(IndexLinear(), a))
 
@@ -129,12 +129,12 @@ Base.convert(::Type{T}, a::AbstractArray) where {T<:FixedSizeArray} = T(a)::T
 # `copyto!`
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)
-    copyto!(memory_of(dst), doff, memory_of(src), soff, n)
+    copyto!(underlying_storage(dst), doff, underlying_storage(src), soff, n)
     dst
 end
 
 Base.@propagate_inbounds function copyto2!(dst, src)
-    copyto!(memory_of(dst), memory_of(src))
+    copyto!(underlying_storage(dst), underlying_storage(src))
     dst
 end
 
