@@ -99,8 +99,6 @@ parent_type(::Type{<:FixedSizeArray{T}}) where {T} = Memory{T}
 underlying_storage(m) = m
 underlying_storage(f::FixedSizeArray) = f.mem
 
-first_linear_index(a) = first(eachindex(IndexLinear(), a))
-
 axes_are_one_based(axes) = all(isone ∘ first, axes)
 
 # converting constructors for copying other array types
