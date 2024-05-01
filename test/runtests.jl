@@ -268,7 +268,9 @@ end
 
     @testset "`copyto!`" begin
         for (D, S) ∈ (
+            (Vector, FixedSizeVector),
             (Memory, FixedSizeVector),
+            (FixedSizeVector, Vector),
             (FixedSizeVector, Memory),
             (FixedSizeVector, FixedSizeVector),
         )
