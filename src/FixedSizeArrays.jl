@@ -96,10 +96,8 @@ end
 
 parent_type(::Type{<:FixedSizeArray{T}}) where {T} = Memory{T}
 
-memory_of(m::Memory) = m
-memory_of(f::FixedSizeArray) = f.mem
-
-first_linear_index(a) = first(eachindex(IndexLinear(), a))
+underlying_storage(m) = m
+underlying_storage(f::FixedSizeArray) = f.mem
 
 axes_are_one_based(axes) = all(isone ∘ first, axes)
 
@@ -126,38 +124,30 @@ FixedSizeArray(a::AbstractArray{T,N})          where {T,N} = FixedSizeArray{T,N}
 Base.convert(::Type{T}, a::T) where {T<:FixedSizeArray} = a
 Base.convert(::Type{T}, a::AbstractArray) where {T<:FixedSizeArray} = T(a)::T
 
-# `copyto!` between `FixedSizeArray` and `Memory`
+# `copyto!`
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)
-    if !iszero(n)
-        if n < false
-            throw(ArgumentError("the number of elements to copy must be nonnegative"))
-        end
-        @boundscheck checkbounds(dst, doff:doff+n-1)
-        @boundscheck checkbounds(src, soff:soff+n-1)
-        @inbounds let d, s
-            d = GenericMemoryRef(memory_of(dst), doff)
-            s = GenericMemoryRef(memory_of(src), soff)
-            unsafe_copyto!(d, s, n)
-        end
-    end
+    copyto!(underlying_storage(dst), doff, underlying_storage(src), soff, n)
     dst
 end
 
-Base.@propagate_inbounds function copyto2!(dst::T, src) where {T}
-    fd = first_linear_index(dst)
-    fs = first_linear_index(src)
-    len = length(src)
-    copyto5!(dst, fd, src, fs, len)::T
+Base.@propagate_inbounds function copyto2!(dst, src)
+    copyto!(underlying_storage(dst), underlying_storage(src))
+    dst
 end
 
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
-Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::Memory        , soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
-Base.@propagate_inbounds Base.copyto!(dst::Memory        , doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
-
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::FixedSizeArray) = copyto2!(dst, src)
-Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::Memory        ) = copyto2!(dst, src)
-Base.@propagate_inbounds Base.copyto!(dst::Memory        , src::FixedSizeArray) = copyto2!(dst, src)
+
+for A ∈ (Array, GenericMemory)  # Add more? Too bad we have to hardcode to avoid ambiguity.
+    @eval begin
+        Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::$A,             soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
+        Base.@propagate_inbounds Base.copyto!(dst::$A,             doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
+
+        Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::$A            ) = copyto2!(dst, src)
+        Base.@propagate_inbounds Base.copyto!(dst::$A,             src::FixedSizeArray) = copyto2!(dst, src)
+    end
+end
 
 # unsafe: the native address of the array's storage
 
