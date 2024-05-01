@@ -116,20 +116,6 @@ function check_count_value(n)
 end
 
 struct SpecFSA{T,N} end
-function fsa_spec_to_type(::SpecFSA{nothing,nothing})
-    FixedSizeArray
-end
-function fsa_spec_to_type(::SpecFSA{nothing,M}) where {M}
-    check_count_value(M)
-    FixedSizeArray{<:Any,M}
-end
-function fsa_spec_to_type(::SpecFSA{E,nothing}) where {E}
-    FixedSizeArray{E::Type}
-end
-function fsa_spec_to_type(::SpecFSA{E,M}) where {E,M}
-    check_count_value(M)
-    FixedSizeArray{E::Type,M}
-end
 function fsa_spec_from_type(::Type{FixedSizeArray})
     SpecFSA{nothing,nothing}()
 end
@@ -320,19 +306,6 @@ function collect_as_fsa_checked(iterator, ::SpecFSA{E,M}, ::Val{M}, length_statu
     collect_as_fsa_impl(iterator, SpecFSA{E,M}(), length_status)::FixedSizeArray{<:Any,M}
 end
 
-function collect_as_fsa(iterator, spec::SpecFSA)
-    size_class = Base.IteratorSize(iterator)
-    if size_class == Base.IsInfinite()
-        throw(ArgumentError("iterator is infinite, can't fit infinitely many elements into a `FixedSizeArray`"))
-    end
-    dim_count_int = dimension_count_of(size_class)
-    check_count_value(dim_count_int)
-    dim_count = Val(dim_count_int)::Val
-    len_stat = length_status(size_class)
-    R = fsa_spec_to_type(spec)::Type{<:FixedSizeArray}
-    collect_as_fsa_checked(iterator, spec, dim_count, len_stat)::R
-end
-
 """
     collect_as(t::Type{<:FixedSizeArray}, iterator)
 
@@ -341,7 +314,15 @@ must either be concrete, or a `UnionAll` without constraints.
 """
 function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
     spec = fsa_spec_from_type(T)::SpecFSA
-    collect_as_fsa(iterator, spec)::T
+    size_class = Base.IteratorSize(iterator)
+    if size_class == Base.IsInfinite()
+        throw(ArgumentError("iterator is infinite, can't fit infinitely many elements into a `FixedSizeArray`"))
+    end
+    dim_count_int = dimension_count_of(size_class)
+    check_count_value(dim_count_int)
+    dim_count = Val(dim_count_int)::Val
+    len_stat = length_status(size_class)
+    collect_as_fsa_checked(iterator, spec, dim_count, len_stat)::T
 end
 
 end # module FixedSizeArrays
