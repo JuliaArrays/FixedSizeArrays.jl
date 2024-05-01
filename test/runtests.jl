@@ -34,6 +34,18 @@ function test_inferred_noalloc(::Type{T},            args::Tuple) where {T  }
     test_inferred(T, args)
 end
 
+# helpers for constructing the type constructors
+
+function fsa(vec_type::Type{<:DenseVector})
+    FixedSizeArray{T,N,vec_type{T}} where {T,N}
+end
+function fsm(vec_type::Type{<:DenseVector})
+    fsa(vec_type){T,2} where {T}
+end
+function fsv(vec_type::Type{<:DenseVector})
+    fsa(vec_type){T,1} where {T}
+end
+
 @testset "FixedSizeArrays" begin
     @testset "meta" begin
         @test isempty(detect_ambiguities(Main))  # test for ambiguities in this file
@@ -41,6 +53,19 @@ end
 
     @testset "Aqua.jl" begin
         Aqua.test_all(FixedSizeArrays)
+    end
+
+    @testset "safe computation of length from dimensions size" begin
+        @test isone(checked_dims(()))
+        for n ∈ 0:30
+            t = Tuple(1:n)
+            if 20 < n
+                @test_throws ArgumentError checked_dims(t)
+            else
+                @test factorial(n) == prod(t) == checked_dims(t)
+                test_inferred_noalloc(checked_dims, Int, (t,))
+            end
+        end
     end
 
     @testset "Constructors" begin
@@ -101,19 +126,6 @@ end
                     @test_throws ArgumentError FixedSizeArray{Float64,n}(undef, siz)
                     @test_throws ArgumentError FixedSizeArray{Float64,n}(undef, siz...)
                 end
-            end
-        end
-    end
-
-    @testset "safe computation of length from dimensions size" begin
-        @test isone(checked_dims(()))
-        for n ∈ 0:30
-            t = Tuple(1:n)
-            if 20 < n
-                @test_throws ArgumentError checked_dims(t)
-            else
-                @test factorial(n) == prod(t) == checked_dims(t)
-                test_inferred_noalloc(checked_dims, Int, (t,))
             end
         end
     end
