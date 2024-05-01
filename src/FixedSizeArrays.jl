@@ -112,7 +112,8 @@ function FixedSizeArray{T,N}(src::AbstractArray{S,N}) where {T,N,S}
     # available for all `AbstractArray` types.
     size = map(length, axs)
     dst = FixedSizeArray{T,N}(undef, size)
-    copyto!(dst, src)::FixedSizeArray{T,N}
+    copyto!(dst.mem, src)
+    dst
 end
 
 FixedSizeArray{T}(a::AbstractArray{<:Any,N})   where {T,N} = FixedSizeArray{T,N}(a)
