@@ -388,9 +388,7 @@ end
         Base.size(i::Iter) = i.size
         Base.eltype(::Type{<:Iter{E}}) where {E} = E
         @testset "buggy iterator with mismatched `size` and `length" begin
-            for iterator ∈ (
-                Iter((), 0, 7), Iter((3, 2), 5, 7),
-            )
+            for iterator ∈ (Iter((), 0, 7), Iter((3, 2), 5, 7))
                 E = eltype(iterator)
                 dim_count = length(size(iterator))
                 for T ∈ (FixedSizeArray, FixedSizeArray{E}, FixedSizeArray{<:Any,dim_count}, FixedSizeArray{E,dim_count})
