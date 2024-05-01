@@ -110,7 +110,6 @@ function check_count_value(n::Int)
     if n < 0
         throw(ArgumentError("count can't be negative"))
     end
-    nothing
 end
 function check_count_value(n)
     throw(ArgumentError("count must be an `Int`"))
@@ -255,7 +254,6 @@ function fill_fsa_from_iterator!(a, iterator)
     if actual_count != length(a)
         throw(ArgumentError("`size`-`length` inconsistency"))
     end
-    nothing
 end
 
 function collect_as_fsam_with_shape(
