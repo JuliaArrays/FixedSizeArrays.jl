@@ -189,7 +189,7 @@ end
 
 # unsafe: the native address of the array's storage
 
-Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T} = Base.unsafe_convert(Ptr{T}, a.mem)
+Base.cconvert(::Type{<:Ptr}, a::FixedSizeArray) = a.mem
 
 # `elsize`: part of the strided arrays interface, used for `pointer`
 
