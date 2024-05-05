@@ -22,7 +22,7 @@ end
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-const default_underlying_storage_type = Memory  # TODO: make user-configurable via Preferences.jl?
+const default_underlying_storage_type = Memory
 
 function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
     FixedSizeArray{T,N,V}(Internal(), V(undef, checked_dims(size))::V, size)
