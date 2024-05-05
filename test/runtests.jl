@@ -3,6 +3,19 @@ using FixedSizeArrays
 using OffsetArrays: OffsetArray
 import Aqua
 
+# Check if the compilation options allow maximum performance.
+const build_is_production_build_env_name = "BUILD_IS_PRODUCTION_BUILD"
+const build_is_production_build = let v = get(ENV, build_is_production_build_env_name, "true")
+    if v ∉ ("false", "true")
+        error("unknown value for environment variable $build_is_production_build_env_name: $v")
+    end
+    if v == "true"
+        true
+    else
+        false
+    end
+end::Bool
+
 const checked_dims = FixedSizeArrays.checked_dims
 const collect_as = FixedSizeArrays.collect_as
 
@@ -10,8 +23,8 @@ const collect_as = FixedSizeArrays.collect_as
 
 allocated(f::F,      args::Tuple) where {F} = @allocated f(args...)
 allocated(::Type{T}, args::Tuple) where {T} = @allocated T(args...)
-test_noalloc(f::F,      args::Tuple) where {F} = @test iszero(allocated(f, args))
-test_noalloc(::Type{T}, args::Tuple) where {T} = @test iszero(allocated(T, args))
+test_noalloc(f::F,      args::Tuple) where {F} = build_is_production_build && @test iszero(allocated(f, args))
+test_noalloc(::Type{T}, args::Tuple) where {T} = build_is_production_build && @test iszero(allocated(T, args))
 function test_inferred(f::F,      ::Type{R}, args::Tuple) where {F,R}
     @test isconcretetype(R)  # meta: test-strictness test
     @test (@inferred f(args...)) isa R
