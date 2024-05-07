@@ -5,7 +5,7 @@
 [![Coverage](https://codecov.io/gh/JuliaArrays/FixedSizeArrays.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaArrays/FixedSizeArrays.jl)
 [![PkgEval](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/F/FixedSizeArrays.svg)](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/F/FixedSizeArrays.html)
 
-`FixedSizeArrays.jl` is a proof-of-concept package for the [Julia programming language](https://julialang.org/) which implements mutable fixed-size arrays, which means the lenght of the array is constant and is amenable to be [constant-propagated](https://en.wikipedia.org/wiki/Constant_folding) at compile-time when possible.
+`FixedSizeArrays.jl` is a proof-of-concept package for the [Julia programming language](https://julialang.org/) which implements mutable fixed-size arrays, which means the length of the array is constant and is amenable to be [constant-propagated](https://en.wikipedia.org/wiki/Constant_folding) at compile-time when possible.
 This is an alternative implementation to [`MArray`](https://juliaarrays.github.io/StaticArrays.jl/stable/pages/api/#StaticArraysCore.MArray) from [`StaticArrays.jl`](https://github.com/JuliaArrays/StaticArrays.jl).
 
 Main differences between `FixedSizeArray` and `MArray` are:
