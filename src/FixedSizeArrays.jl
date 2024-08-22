@@ -11,23 +11,37 @@ Implementation detail. Do not use.
 """
 struct Internal end
 
-struct FixedSizeArray{T,N} <: DenseArray{T,N}
-    mem::Memory{T}
+struct FixedSizeArray{T,N,Mem<:GenericMemory{<:Any,T}} <: DenseArray{T,N}
+    mem::Mem
     size::NTuple{N,Int}
-    function FixedSizeArray{T,N}(::Internal, mem::Memory{T}, size::NTuple{N,Int}) where {T,N}
-        new{T,N}(mem, size)
+    function FixedSizeArray{T,N,M}(::Internal, mem::M, size::NTuple{N,Int}) where {T,N,M<:GenericMemory{<:Any,T}}
+        new{T,N,M}(mem, size)
     end
 end
 
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Int}) where {T,N}
-    FixedSizeArray{T,N}(Internal(), Memory{T}(undef, checked_dims(size)), size)
+const default_underlying_storage_type = Memory
+
+function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
+    FixedSizeArray{T,N,V}(Internal(), V(undef, checked_dims(size))::V, size)
+end
+function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N,V}
+    ints = map(Int, size)::NTuple{N,Int}  # prevent infinite recursion
+    FixedSizeArray{T,N,V}(undef, ints)
+end
+function FixedSizeArray{T,N,V}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N,V}
+    FixedSizeArray{T,N,V}(undef, size)
+end
+function FixedSizeArray{T,<:Any,V}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N,V}
+    FixedSizeArray{T,N,V}(undef, size)
+end
+function FixedSizeArray{T,<:Any,V}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N,V}
+    FixedSizeArray{T,N,V}(undef, size)
 end
 function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N}
-    ints = map(Int, size)::NTuple{N,Int}  # prevent infinite recursion
-    FixedSizeArray{T,N}(undef, ints)
+    FixedSizeArray{T,N,default_underlying_storage_type{T}}(undef, size)
 end
 function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N}
     FixedSizeArray{T,N}(undef, size)
@@ -45,8 +59,8 @@ Base.@propagate_inbounds Base.setindex!(A::FixedSizeArray, v, i::Int) = A.mem[i]
 
 Base.size(a::FixedSizeArray) = a.size
 
-function Base.similar(::FixedSizeArray, ::Type{S}, size::NTuple{N,Int}) where {S,N}
-    FixedSizeArray{S,N}(undef, size)
+function Base.similar(::T, ::Type{E}, size::NTuple{N,Int}) where {T<:FixedSizeArray,E,N}
+    with_replaced_parameters(DenseArray, T, Val(E), Val(N))(undef, size)
 end
 
 Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
@@ -83,18 +97,44 @@ end
 
 # broadcasting
 
-function Base.BroadcastStyle(::Type{<:FixedSizeArray})
-    Broadcast.ArrayStyle{FixedSizeArray}()
+function Base.BroadcastStyle(::Type{T}) where {T<:FixedSizeArray}
+    Broadcast.ArrayStyle{stripped_type(DenseArray, T)}()
 end
 
 function Base.similar(
-    bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{FixedSizeArray}},
+    bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{S}},
     ::Type{E},
-) where {E}
-    similar(FixedSizeArray{E}, axes(bc))
+) where {S<:FixedSizeArray,E}
+    similar(S{E}, axes(bc))
 end
 
 # helper functions
+
+normalized_type(::Type{T}) where {T} = T
+
+function stripped_type_unchecked(::Type{DenseVector}, ::Type{<:GenericMemory{K,<:Any,AS}}) where {K,AS}
+    GenericMemory{K,<:Any,AS}
+end
+
+Base.@assume_effects :consistent function stripped_type_unchecked(
+    ::Type{DenseArray}, ::Type{<:FixedSizeArray{<:Any,<:Any,V}},
+) where {V}
+    U = stripped_type(DenseVector, V)
+    FixedSizeArray{E,N,U{E}} where {E,N}
+end
+
+function stripped_type(::Type{T}, ::Type{S}) where {T,S<:T}
+    ret = stripped_type_unchecked(T, S)::Type{<:T}::UnionAll
+    S::Type{<:ret}
+    normalized_type(ret)  # ensure `UnionAll` type variable order is normalized
+end
+
+function with_replaced_parameters(::Type{T}, ::Type{S}, ::Val{P1}, ::Val{P2}) where {T,S<:T,P1,P2}
+    t = T{P1,P2}::Type{<:T}
+    s = stripped_type(T, S)
+    S::Type{<:s}
+    s{P1,P2}::Type{<:s}::Type{<:T}::Type{<:t}
+end
 
 dimension_count_of(::Base.SizeUnknown) = 1
 dimension_count_of(::Base.HasLength) = 1
@@ -115,23 +155,49 @@ function check_count_value(n)
     throw(ArgumentError("count must be an `Int`"))
 end
 
-struct SpecFSA{T,N} end
+# TODO: use `SpecFSA` for implementing each `FixedSizeArray` constructor?
+struct SpecFSA{N,Mem<:GenericMemory} end
 function fsa_spec_from_type(::Type{FixedSizeArray})
-    SpecFSA{nothing,nothing}()
+    SpecFSA{nothing,default_underlying_storage_type}()
 end
 function fsa_spec_from_type(::Type{FixedSizeArray{<:Any,M}}) where {M}
     check_count_value(M)
-    SpecFSA{nothing,M}()
+    SpecFSA{M,default_underlying_storage_type}()
 end
 function fsa_spec_from_type(::Type{FixedSizeArray{E}}) where {E}
-    SpecFSA{E::Type,nothing}()
+    E::Type
+    SpecFSA{nothing,default_underlying_storage_type{E}}()
 end
 function fsa_spec_from_type(::Type{FixedSizeArray{E,M}}) where {E,M}
     check_count_value(M)
-    SpecFSA{E::Type,M}()
+    E::Type
+    SpecFSA{M,default_underlying_storage_type{E}}()
+end
+function fsa_spec_from_type(::Type{FixedSizeArray{E,<:Any,V}}) where {E,V}
+    E::Type
+    V::Type{<:DenseVector{E}}
+    SpecFSA{nothing,V}()
+end
+function fsa_spec_from_type(::Type{FixedSizeArray{E,M,V}}) where {E,M,V}
+    check_count_value(M)
+    E::Type
+    V::Type{<:DenseVector{E}}
+    SpecFSA{M,V}()
+end
+for V ∈ (Memory, AtomicMemory)
+    T = FixedSizeArray{E,M,V{E}} where {E,M}
+    @eval begin
+        function fsa_spec_from_type(::Type{$T})
+            SpecFSA{nothing,$V}()
+        end
+        function fsa_spec_from_type(::Type{($T){<:Any,M}}) where {M}
+            check_count_value(M)
+            SpecFSA{M,$V}()
+        end
+    end
 end
 
-parent_type(::Type{<:FixedSizeArray{T}}) where {T} = Memory{T}
+parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,T}}) where {T} = T
 
 underlying_storage(m) = m
 underlying_storage(f::FixedSizeArray) = f.mem
@@ -140,7 +206,7 @@ axes_are_one_based(axes) = all(isone ∘ first, axes)
 
 # converting constructors for copying other array types
 
-function FixedSizeArray{T,N}(src::AbstractArray{S,N}) where {T,N,S}
+function FixedSizeArray{T,N,V}(src::AbstractArray{S,N}) where {T,N,V,S}
     axs = axes(src)
     if !axes_are_one_based(axs)
         throw(DimensionMismatch("source array has a non-one-based indexing axis"))
@@ -148,11 +214,14 @@ function FixedSizeArray{T,N}(src::AbstractArray{S,N}) where {T,N,S}
     # Can't use `Base.size` because, according to it's doc string, it's not
     # available for all `AbstractArray` types.
     size = map(length, axs)
-    dst = FixedSizeArray{T,N}(undef, size)
+    dst = FixedSizeArray{T,N,V}(undef, size)
     copyto!(dst.mem, src)
     dst
 end
 
+FixedSizeArray{T,<:Any,V}(a::AbstractArray{<:Any,N}) where {V,T,N} = FixedSizeArray{T,N,V}(a)
+
+FixedSizeArray{T,N}(a::AbstractArray{<:Any,N}) where {T,N} = FixedSizeArray{T,N,default_underlying_storage_type{T}}(a)
 FixedSizeArray{T}(a::AbstractArray{<:Any,N})   where {T,N} = FixedSizeArray{T,N}(a)
 FixedSizeArray{<:Any,N}(a::AbstractArray{T,N}) where {T,N} = FixedSizeArray{T,N}(a)
 FixedSizeArray(a::AbstractArray{T,N})          where {T,N} = FixedSizeArray{T,N}(a)
@@ -197,27 +266,29 @@ Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
 
 # `reshape`: specializing it to ensure it returns a `FixedSizeArray`
 
-function Base.reshape(a::FixedSizeArray{T}, size::NTuple{N,Int}) where {T,N}
+function Base.reshape(a::FixedSizeArray{T,<:Any,V}, size::NTuple{N,Int}) where {V,T,N}
     len = checked_dims(size)
     if length(a) != len
         throw(DimensionMismatch("new shape not consistent with existing array length"))
     end
-    FixedSizeArray{T,N}(Internal(), a.mem, size)
+    FixedSizeArray{T,N,V}(Internal(), a.mem, size)
 end
 
 # `collect_as`
 
-function collect_as_fsa0(iterator, ::Val{nothing})
+function collect_as_fsa0(iterator, ::SpecFSA{0,V}) where {V}
+    V::UnionAll
     x = only(iterator)
-    ret = FixedSizeArray{typeof(x),0}(undef)
+    E = typeof(x)::Type
+    ret = FixedSizeArray{E,0,V{E}}(undef)
     ret[] = x
     ret
 end
 
-function collect_as_fsa0(iterator, ::Val{E}) where {E}
+function collect_as_fsa0(iterator, ::SpecFSA{0,V}) where {E,V<:DenseVector{E}}
     E::Type
     x = only(iterator)
-    ret = FixedSizeArray{E,0}(undef)
+    ret = FixedSizeArray{E,0,V}(undef)
     ret[] = x
     ret
 end
@@ -234,24 +305,26 @@ function fill_fsa_from_iterator!(a, iterator)
 end
 
 function collect_as_fsam_with_shape(
-    iterator, ::SpecFSA{nothing,M}, shape::Tuple{Vararg{Int}},
-) where {M}
+    iterator, ::SpecFSA{M,V}, shape::Tuple{Vararg{Int}},
+) where {M,V}
+    V::UnionAll
     E = eltype(iterator)::Type
-    ret = FixedSizeArray{E,M}(undef, shape)
+    U = V{E}
+    ret = FixedSizeArray{E,M,U}(undef, shape)
     fill_fsa_from_iterator!(ret, iterator)
-    map(identity, ret)::FixedSizeArray{<:Any,M}
+    map(identity, ret)::(FixedSizeArray{T,M,V{T}} where {T})
 end
 
 function collect_as_fsam_with_shape(
-    iterator, ::SpecFSA{E,M}, shape::Tuple{Vararg{Int}},
-) where {E,M}
+    iterator, ::SpecFSA{M,V}, shape::Tuple{Vararg{Int}},
+) where {M,E,V<:DenseVector{E}}
     E::Type
-    ret = FixedSizeArray{E,M}(undef, shape)
+    ret = FixedSizeArray{E,M,V}(undef, shape)
     fill_fsa_from_iterator!(ret, iterator)
-    ret::FixedSizeArray{E,M}
+    ret::FixedSizeArray{E,M,V}
 end
 
-function collect_as_fsam(iterator, spec::SpecFSA{<:Any,M}) where {M}
+function collect_as_fsam(iterator, spec::SpecFSA{M}) where {M}
     check_count_value(M)
     shape = if isone(M)
         (length(iterator),)
@@ -262,39 +335,42 @@ function collect_as_fsam(iterator, spec::SpecFSA{<:Any,M}) where {M}
     collect_as_fsam_with_shape(iterator, spec, shap)::FixedSizeArray{<:Any,M}
 end
 
-function collect_as_fsa1_from_unknown_length(iterator, ::Val{nothing})
+function collect_as_fsa1_from_unknown_length(iterator, ::SpecFSA{1,V}) where {V}
+    V::UnionAll
     v = collect(iterator)::AbstractVector
-    T = FixedSizeVector
-    map(identity, T(v))::T
+    t = FixedSizeVector(v)::FixedSizeVector
+    s = map(identity, t)::FixedSizeVector  # fix element type
+    et = eltype(s)
+    FixedSizeVector{et,V{et}}(s)  # fix underlying storage type
 end
 
-function collect_as_fsa1_from_unknown_length(iterator, ::Val{E}) where {E}
+function collect_as_fsa1_from_unknown_length(iterator, ::SpecFSA{1,V}) where {E,V<:DenseVector{E}}
     E::Type
     v = collect(E, iterator)::AbstractVector{E}
-    T = FixedSizeVector{E}
+    T = FixedSizeVector{E,V}
     T(v)::T
 end
 
-function collect_as_fsa_impl(iterator, ::SpecFSA{E,0}, ::LengthIsKnown) where {E}
-    collect_as_fsa0(iterator, Val(E))::FixedSizeArray{<:Any,0}
+function collect_as_fsa_impl(iterator, spec::SpecFSA{0}, ::LengthIsKnown)
+    collect_as_fsa0(iterator, spec)::FixedSizeArray{<:Any,0}
 end
 
 function collect_as_fsa_impl(iterator, spec::SpecFSA, ::LengthIsKnown)
     collect_as_fsam(iterator, spec)::FixedSizeArray
 end
 
-function collect_as_fsa_impl(iterator, ::SpecFSA{E,1}, ::LengthIsUnknown) where {E}
-    collect_as_fsa1_from_unknown_length(iterator, Val(E))::FixedSizeVector
+function collect_as_fsa_impl(iterator, spec::SpecFSA{1}, ::LengthIsUnknown)
+    collect_as_fsa1_from_unknown_length(iterator, spec)::FixedSizeVector
 end
 
-function collect_as_fsa_checked(iterator, ::SpecFSA{E,nothing}, ::Val{M}, length_status) where {E,M}
+function collect_as_fsa_checked(iterator, ::SpecFSA{nothing,V}, ::Val{M}, length_status) where {V,M}
     check_count_value(M)
-    collect_as_fsa_impl(iterator, SpecFSA{E,M}(), length_status)::FixedSizeArray{<:Any,M}
+    collect_as_fsa_impl(iterator, SpecFSA{M,V}(), length_status)::FixedSizeArray{<:Any,M}
 end
 
-function collect_as_fsa_checked(iterator, ::SpecFSA{E,M}, ::Val{M}, length_status) where {E,M}
+function collect_as_fsa_checked(iterator, spec::SpecFSA{M}, ::Val{M}, length_status) where {M}
     check_count_value(M)
-    collect_as_fsa_impl(iterator, SpecFSA{E,M}(), length_status)::FixedSizeArray{<:Any,M}
+    collect_as_fsa_impl(iterator, spec, length_status)::FixedSizeArray{<:Any,M}
 end
 
 """
