@@ -185,6 +185,15 @@ end
             end
         end
 
+        @testset "setindex!" begin
+            v = FSV{Float64}(undef, 2)
+            v[1] = 1
+            v[2] = 2
+            @test v[1] == 1
+            @test v[2] == 2
+            @test_throws BoundsError v[3] = 3
+        end
+
         @testset "FixedSizeVector" begin
             v = FSV{Float64}(undef, 3)
             @test length(v) == 3
