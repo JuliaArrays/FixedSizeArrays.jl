@@ -19,6 +19,14 @@ struct FixedSizeArray{T,N,Mem<:GenericMemory{<:Any,T}} <: DenseArray{T,N}
     end
 end
 
+function Base.propertynames(
+    # the `unused` is here because of https://github.com/JuliaLang/julia/issues/44428
+    (@nospecialize unused::FixedSizeArray),
+    ::Bool = false,
+)
+    ()
+end
+
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 

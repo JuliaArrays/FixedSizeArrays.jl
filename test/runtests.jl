@@ -125,6 +125,17 @@ end
         FSM = fsm(storage_type)
         FSA = fsa(storage_type)
 
+        @testset "`propertynames`" begin
+            for dim_count ∈ 0:4
+                for T ∈ (Int, Float32)
+                    siz = ntuple(Returns(1), dim_count)
+                    arr = FSA{T}(undef, siz)
+                    test_inferred(propertynames, Tuple{}, (arr,))
+                    test_inferred(propertynames, Tuple{}, (arr, false))
+                end
+            end
+        end
+
         @testset "Constructors" begin
             for dim_count ∈ 0:4
                 siz = ntuple(Returns(2), dim_count)
