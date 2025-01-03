@@ -1,6 +1,7 @@
 module FixedSizeArrays
 
 include("FixedSizeArray.jl")
+include("FixedSizeBitArray.jl")
 
 if isdefined(Base, :dataids) && (Base.dataids isa Function)
     # This is an internal, non-public function which is nevertheless needed to
