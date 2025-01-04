@@ -72,7 +72,7 @@ function Base.fill!(B::FixedSizeBitArray, x)
     return B
 end
 
-function (==)(A::FixedSizeBitArray, B::FixedSizeBitArray)
+function Base.:(==)(A::FixedSizeBitArray, B::FixedSizeBitArray)
     size(A) != size(B) && return false
     return A.chunks == B.chunks
 end
