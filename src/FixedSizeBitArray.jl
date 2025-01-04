@@ -10,8 +10,8 @@ struct FixedSizeBitArray{N} <: AbstractArray{Bool,N}
     function FixedSizeBitArray{N}(::Internal, size::NTuple{N,Int}) where {N}
         nc = num_bit_chunks(size)
         chunks = Memory{UInt64}(undef, nc)
-        # we want the last chunks to be zerod and it's easier to just zero all of them
-        copyto!(chunks UInt64(0))
+        # we want the last chunks to be zeroed and it's easier to just zero all of them
+        copyto!(chunks, UInt64(0))
         new{N}(chunks, size)
     end
 end
