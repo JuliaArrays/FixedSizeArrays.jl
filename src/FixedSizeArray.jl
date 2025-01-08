@@ -176,7 +176,7 @@ Furthermore, `s` has type variables in place of the type parameters specified
 via `spec`.
 
 NB: `Val{s}()` is returned instead of `s` so the method would be *consistent*
-from the point of view of Julia's effect inference, enabling constant-folding.
+from the point of view of Julia's effect inference, enabling constant folding.
 
 NB: this function is supposed to only have the one method. To add
 functionality, add methods to [`with_stripped_type_parameters_unchecked`](@ref).
