@@ -130,16 +130,25 @@ end
 
 # broadcasting
 
-function Base.BroadcastStyle(::Type{T}) where {T<:FixedSizeArray}
-    spec = TypeParametersElementTypeAndDimensionality()
-    Broadcast.ArrayStyle{val_parameter(with_stripped_type_parameters(spec, T))}()
+struct FixedSizeArrayBroadcastStyle{N, Mem <: DenseVector} <: Broadcast.AbstractArrayStyle{N} end
+
+function (::Type{<:(FixedSizeArrayBroadcastStyle{N, Mem} where {N})})(::Val{M}) where {Mem, M}
+    m = check_count_value(M)
+    FixedSizeArrayBroadcastStyle{m, Mem}()  # `FixedSizeArray` supports any dimensionality
+end
+
+function Base.BroadcastStyle(::Type{<:(FixedSizeArray{T, N, Mem} where {T})}) where {N, Mem}
+    n = check_count_value(N)
+    spec = TypeParametersElementType()
+    mem = val_parameter(with_stripped_type_parameters(spec, Mem))
+    FixedSizeArrayBroadcastStyle{n, mem}()
 end
 
 function Base.similar(
-    bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{S}},
+    bc::(Broadcast.Broadcasted{FixedSizeArrayBroadcastStyle{N, Mem}} where {N}),
     ::Type{E},
-) where {S<:FixedSizeArray,E}
-    similar(S{E}, axes(bc))
+) where {Mem,E}
+    similar((FixedSizeArray{E, N, Mem{E}} where {N}), axes(bc))
 end
 
 # helper functions
