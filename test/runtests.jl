@@ -139,7 +139,7 @@ end
         test_inferred(FixedSizeArray{Int}, return_type, (undef, (3,)))
         test_inferred(FixedSizeVector{Int}, return_type, (undef, 3))
         test_inferred(FixedSizeVector{Int}, return_type, (undef, (3,)))
-        iter = (i for i ∈ 1:3)
+        iter = Iterators.filter(iseven, 3:7)
         @test collect_as(FixedSizeArray, iter) isa return_type
         test_inferred(collect_as, return_type, (FixedSizeArray{Int}, iter))
         test_inferred(collect_as, return_type, (FixedSizeVector{Int}, iter))
@@ -468,6 +468,15 @@ end
         end
 
         @testset "`collect_as`" begin
+            @testset "empty iterator with inexact `eltype`" begin
+                iterator = Iterators.map((x -> x + 0.3), [])
+                @test collect_as(FSV, iterator) isa FSV{Union{}}
+            end
+            @testset "`Union{}`" begin
+                @test_throws Exception collect_as(Union{}, ())
+                @test_throws Exception collect_as(FixedSizeVector{Union{}, Union{}}, ())
+                @test_throws Exception collect_as(FixedSizeVector{<:Any, Union{}}, ())
+            end
             for T ∈ (FSA{Int}, FSV{Int})
                 for iterator ∈ (Iterators.repeated(7), Iterators.cycle(7))
                     @test_throws ArgumentError collect_as(T, iterator)
@@ -484,7 +493,7 @@ end
                     E = eltype(iterator)
                     dim_count = length(size(iterator))
                     for T ∈ (FSA{E}, FSA{E,dim_count})
-                        @test_throws ArgumentError collect_as(T, iterator)
+                        @test_throws DimensionMismatch collect_as(T, iterator)
                     end
                 end
             end
@@ -500,7 +509,7 @@ end
                 (E, dim_count) = abstract_array_params(a)
                 af = collect(Float64, iterator)
                 @test abstract_array_params(af) == (Float64, dim_count)  # meta
-                @test_throws MethodError collect_as(FSA{E,dim_count+1}, iterator)
+                @test_throws DimensionMismatch collect_as(FSA{E,dim_count+1}, iterator)
                 for T ∈ (FSA{E}, FSA{E,dim_count})
                     test_inferred(collect_as, FSA{E,dim_count}, (T, iterator))
                     fsa = collect_as(T, iterator)

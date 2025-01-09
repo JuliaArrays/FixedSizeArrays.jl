@@ -204,60 +204,12 @@ dimension_count_of(::Base.SizeUnknown) = 1
 dimension_count_of(::Base.HasLength) = 1
 dimension_count_of(::Base.HasShape{N}) where {N} = convert(Int, N)::Int
 
-struct LengthIsUnknown end
-struct LengthIsKnown end
-length_status(::Base.SizeUnknown) = LengthIsUnknown()
-length_status(::Base.HasLength) = LengthIsKnown()
-length_status(::Base.HasShape) = LengthIsKnown()
-
 function check_count_value(n)
     n = n::Int
     if n < 0
         throw(ArgumentError("count can't be negative"))
     end
     n
-end
-
-# TODO: use `SpecFSA` for implementing each `FixedSizeArray` constructor?
-struct SpecFSA{N,Mem<:DenseVector} end
-function fsa_spec_from_type(::Type{FixedSizeArray})
-    SpecFSA{nothing,default_underlying_storage_type}()
-end
-function fsa_spec_from_type(::Type{FixedSizeArray{<:Any,M}}) where {M}
-    check_count_value(M)
-    SpecFSA{M,default_underlying_storage_type}()
-end
-function fsa_spec_from_type(::Type{FixedSizeArray{E}}) where {E}
-    E::Type
-    SpecFSA{nothing,default_underlying_storage_type{E}}()
-end
-function fsa_spec_from_type(::Type{FixedSizeArray{E,M}}) where {E,M}
-    check_count_value(M)
-    E::Type
-    SpecFSA{M,default_underlying_storage_type{E}}()
-end
-function fsa_spec_from_type(::Type{FixedSizeArray{E,<:Any,V}}) where {E,V}
-    E::Type
-    V::Type{<:DenseVector{E}}
-    SpecFSA{nothing,V}()
-end
-function fsa_spec_from_type(::Type{FixedSizeArray{E,M,V}}) where {E,M,V}
-    check_count_value(M)
-    E::Type
-    V::Type{<:DenseVector{E}}
-    SpecFSA{M,V}()
-end
-for V ∈ (Vector, optional_memory..., optional_atomic_memory...)
-    T = FixedSizeArray{E,M,V{E}} where {E,M}
-    @eval begin
-        function fsa_spec_from_type(::Type{$T})
-            SpecFSA{nothing,$V}()
-        end
-        function fsa_spec_from_type(::Type{($T){<:Any,M}}) where {M}
-            check_count_value(M)
-            SpecFSA{M,$V}()
-        end
-    end
 end
 
 parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,T}}) where {T} = T

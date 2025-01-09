@@ -1,100 +1,110 @@
 export collect_as
 
-function collect_as_fsa0(iterator, ::SpecFSA{0,V}) where {V}
-    V::UnionAll
-    x = only(iterator)
-    E = typeof(x)::Type
-    ret = FixedSizeArray{E,0,V{E}}(undef)
-    ret[] = x
-    ret
+function throw_bottom_type()
+    throw(ArgumentError("`Union{}` not expected"))
 end
 
-function collect_as_fsa0(iterator, ::SpecFSA{0,V}) where {E,V<:DenseVector{E}}
-    E::Type
-    x = only(iterator)
-    ret = FixedSizeArray{E,0,V}(undef)
-    ret[] = x
-    ret
+function parent_type_with_default(::Type{<:(FixedSizeArray{E, N, T} where {N})}) where {E, T <: DenseVector{E}}
+    T
 end
-
-function fill_fsa_from_iterator!(a, iterator)
-    actual_count = 0
-    for e ∈ iterator
-        actual_count += 1
-        a[actual_count] = e
-    end
-    if actual_count != length(a)
-        throw(ArgumentError("`size`-`length` inconsistency"))
+function parent_type_with_default(::Type{<:FixedSizeArray{E}}) where {E}
+    default_underlying_storage_type{E}
+end
+function parent_type_with_default(::Type{<:FixedSizeArray})
+    default_underlying_storage_type
+end
+for T ∈ (Vector, optional_memory...)
+    FSA = FixedSizeArray{E, N, T{E}} where {E, N}
+    @eval begin
+        function parent_type_with_default(::Type{$FSA})
+            $T
+        end
+        function parent_type_with_default(::Type{($FSA){E, N} where {E}}) where {N}
+            $T
+        end
     end
 end
 
-function collect_as_fsam_with_shape(
-    iterator, ::SpecFSA{M,V}, shape::Tuple{Vararg{Int}},
-) where {M,V}
-    V::UnionAll
-    E = eltype(iterator)::Type
-    U = V{E}
-    ret = FixedSizeArray{E,M,U}(undef, shape)
-    fill_fsa_from_iterator!(ret, iterator)
-    map(identity, ret)::(FixedSizeArray{T,M,V{T}} where {T})
+function push_vector(::Type{V}, v, e) where {V <: AbstractVector}
+    ret = V(undef, length(v) + 1)
+    copyto!(ret, v)
+    ret[end] = e
+    ret
 end
 
-function collect_as_fsam_with_shape(
-    iterator, ::SpecFSA{M,V}, shape::Tuple{Vararg{Int}},
-) where {M,E,V<:DenseVector{E}}
-    E::Type
-    ret = FixedSizeArray{E,M,V}(undef, shape)
-    fill_fsa_from_iterator!(ret, iterator)
-    ret::FixedSizeArray{E,M,V}
+function push_fsv(::Type{V}, v, e) where {E, V <: DenseVector{E}}
+    FSV = FixedSizeVector{E, V}
+    push_vector(FSV, v, e)
 end
 
-function collect_as_fsam(iterator, spec::SpecFSA{M}) where {M}
-    check_count_value(M)
-    shape = if isone(M)
-        (length(iterator),)
+function push_fsv(::Type{V}, v, e) where {V <: DenseVector}
+    E = typejoin(typeof(e), eltype(v))
+    FSV = FixedSizeVector{E, V{E}}
+    push_vector(FSV, v, e)
+end
+
+function empty_fsv(::Type{V}, ::Any) where {E, V <: DenseVector{E}}
+    FixedSizeVector{E, V}(undef, 0)
+end
+
+function empty_fsv(::Type{V}, iterator) where {V <: DenseVector}
+    let E = eltype(iterator)
+        if isconcretetype(E)
+            FixedSizeVector{E, V{E}}(undef, 0)
+        else
+            let E = Union{}
+                FixedSizeVector{E, V{E}}(undef, 0)
+            end
+        end
+    end
+end
+
+function collect_as_fsv(::Type{V}, iterator) where {V <: DenseVector}
+    es1 = iterate(iterator)  # unroll a bit to avoid unnecessary allocations and help inference
+    T2 = Tuple{Any, Any}
+    if es1 isa T2
+        let (e1, s1) = es1, es2 = iterate(iterator, s1)
+            if es2 isa T2
+                let (e2, s2) = es2, state = s2, ret = push_fsv(V, (e1,), e2)
+                    while true
+                        es = iterate(iterator, state)
+                        if es isa T2
+                            let (e, s) = es
+                                state = s
+                                ret = push_fsv(V, ret, e)
+                            end
+                        else
+                            break
+                        end
+                    end
+                    ret
+                end
+            else
+                push_fsv(V, (), e1)
+            end
+        end
     else
-        size(iterator)
-    end::NTuple{M,Any}
-    shap = map(Int, shape)::NTuple{M,Int}
-    collect_as_fsam_with_shape(iterator, spec, shap)::FixedSizeArray{<:Any,M}
+        empty_fsv(V, iterator)
+    end
 end
 
-function collect_as_fsa1_from_unknown_length(iterator, ::SpecFSA{1,V}) where {V}
-    V::UnionAll
-    v = collect(iterator)::AbstractVector
-    t = FixedSizeVector(v)::FixedSizeVector
-    s = map(identity, t)::FixedSizeVector  # fix element type
-    et = eltype(s)
-    FixedSizeVector{et,V{et}}(s)  # fix underlying storage type
+function checked_dimension_count_of(::Type{<:AbstractArray{<:Any, N}}, input_size_class) where {N}
+    n = check_count_value(N)
+    m = dimension_count_of(input_size_class)::Int
+    if n != m
+        throw(DimensionMismatch())
+    end
+    n
+end
+function checked_dimension_count_of(::Type, input_size_class)
+    check_count_value(dimension_count_of(input_size_class))
 end
 
-function collect_as_fsa1_from_unknown_length(iterator, ::SpecFSA{1,V}) where {E,V<:DenseVector{E}}
-    E::Type
-    v = collect(E, iterator)::AbstractVector{E}
-    T = FixedSizeVector{E,V}
-    T(v)::T
+function collect_as(::Type{<:(FixedSizeArray{E, N, Union{}} where {E, N})}, ::Any)
+    throw_bottom_type()
 end
-
-function collect_as_fsa_impl(iterator, spec::SpecFSA{0}, ::LengthIsKnown)
-    collect_as_fsa0(iterator, spec)::FixedSizeArray{<:Any,0}
-end
-
-function collect_as_fsa_impl(iterator, spec::SpecFSA, ::LengthIsKnown)
-    collect_as_fsam(iterator, spec)::FixedSizeArray
-end
-
-function collect_as_fsa_impl(iterator, spec::SpecFSA{1}, ::LengthIsUnknown)
-    collect_as_fsa1_from_unknown_length(iterator, spec)::FixedSizeVector
-end
-
-function collect_as_fsa_checked(iterator, ::SpecFSA{nothing,V}, ::Val{M}, length_status) where {V,M}
-    check_count_value(M)
-    collect_as_fsa_impl(iterator, SpecFSA{M,V}(), length_status)::FixedSizeArray{<:Any,M}
-end
-
-function collect_as_fsa_checked(iterator, spec::SpecFSA{M}, ::Val{M}, length_status) where {M}
-    check_count_value(M)
-    collect_as_fsa_impl(iterator, spec, length_status)::FixedSizeArray{<:Any,M}
+function collect_as(::Type{Union{}}, ::Any)
+    throw_bottom_type()
 end
 
 """
@@ -104,14 +114,16 @@ Tries to construct a value of type `t` from the iterator `iterator`. The type `t
 must either be concrete, or a `UnionAll` without constraints.
 """
 function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
-    spec = fsa_spec_from_type(T)::SpecFSA
     size_class = Base.IteratorSize(iterator)
     if size_class == Base.IsInfinite()
         throw(ArgumentError("iterator is infinite, can't fit infinitely many elements into a `FixedSizeArray`"))
     end
-    dim_count_int = dimension_count_of(size_class)
-    check_count_value(dim_count_int)
-    dim_count = Val(dim_count_int)::Val
-    len_stat = length_status(size_class)
-    collect_as_fsa_checked(iterator, spec, dim_count, len_stat)::T
+    mem = parent_type_with_default(T)
+    output_dimension_count = checked_dimension_count_of(T, size_class)
+    fsv = collect_as_fsv(mem, iterator)
+    if isone(output_dimension_count)
+        fsv
+    else
+        reshape(fsv, size(iterator))
+    end
 end
