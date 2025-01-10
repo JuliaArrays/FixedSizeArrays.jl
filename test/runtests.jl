@@ -443,10 +443,8 @@ end
                     @test_throws ArgumentError collect_as(T, iterator)
                 end
             end
-            for T ∈ (FSA{Int,-1}, FSA{Int,3.1})
-                iterator = (7:8, (7, 8))
-                @test_throws ArgumentError collect_as(T, iterator)
-            end
+            @test_throws ArgumentError collect_as(FSA{Int, -1}, 7:8)
+            @test_throws TypeError collect_as(FSA{Int, 3.1}, 7:8)
             for T ∈ (FSA{3}, FSV{3})
                 iterator = (7:8, (7, 8))
                 @test_throws TypeError collect_as(T, iterator)

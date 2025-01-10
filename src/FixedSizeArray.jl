@@ -212,13 +212,12 @@ length_status(::Base.SizeUnknown) = LengthIsUnknown()
 length_status(::Base.HasLength) = LengthIsKnown()
 length_status(::Base.HasShape) = LengthIsKnown()
 
-function check_count_value(n::Int)
+function check_count_value(n)
+    n = n::Int
     if n < 0
         throw(ArgumentError("count can't be negative"))
     end
-end
-function check_count_value(n)
-    throw(ArgumentError("count must be an `Int`"))
+    n
 end
 
 # TODO: use `SpecFSA` for implementing each `FixedSizeArray` constructor?
