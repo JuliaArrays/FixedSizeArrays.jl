@@ -68,9 +68,9 @@ end
 Base.size(a::FixedSizeArray) = a.size
 
 function Base.similar(::T, ::Type{E}, size::NTuple{N,Int}) where {T<:FixedSizeArray,E,N}
-    a = with_replaced_type_parameters(TypeParametersElementType(), T, Val(E))
-    b = with_replaced_type_parameters(TypeParametersDimensionality(), val_parameter(a), Val(N))
-    val_parameter(b)(undef, size)
+    spec = TypeParametersElementTypeAndDimensionality()
+    S = val_parameter(with_stripped_type_parameters(spec, T)){E, N}
+    S(undef, size)
 end
 
 Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
@@ -124,7 +124,6 @@ end
 val_parameter(::Val{P}) where {P} = P
 
 struct TypeParametersElementType end
-struct TypeParametersDimensionality end
 struct TypeParametersElementTypeAndDimensionality end
 
 """
@@ -142,19 +141,6 @@ end
 
 # `Base.@assume_effects :consistent` is a workaround for:
 # https://github.com/JuliaLang/julia/issues/56966
-
-Base.@assume_effects :consistent function with_stripped_type_parameters_unchecked(spec::TypeParametersElementType, ::Type{<:(FixedSizeArray{T, N, Mem} where {T})}) where {N, Mem}
-    mem_v = with_stripped_type_parameters(spec, Mem)
-    mem = val_parameter(mem_v)
-    s = FixedSizeArray{T, N, mem{T}} where {T}
-    Val{s}()
-end
-
-Base.@assume_effects :consistent function with_stripped_type_parameters_unchecked(::TypeParametersDimensionality, ::Type{<:(FixedSizeArray{T, N, Mem} where {N})}) where {T, Mem}
-    s = FixedSizeArray{T, N, Mem} where {N}
-    Val{s}()
-end
-
 Base.@assume_effects :consistent function with_stripped_type_parameters_unchecked(::TypeParametersElementTypeAndDimensionality, ::Type{<:(FixedSizeArray{T, N, Mem} where {T, N})}) where {Mem}
     spec_mem = TypeParametersElementType()
     mem_v = with_stripped_type_parameters(spec_mem, Mem)
@@ -186,14 +172,6 @@ function with_stripped_type_parameters(spec, t::Type)
     s = val_parameter(ret)
     s = s::UnionAll
     s = s::(Type{T} where {T>:t})
-    Val{s}()
-end
-
-function with_replaced_type_parameters(spec, type::Type, parameter::Val)
-    tv = with_stripped_type_parameters(spec, type)
-    t = val_parameter(tv)
-    p = val_parameter(parameter)
-    s = t{p}
     Val{s}()
 end
 
