@@ -185,7 +185,7 @@ function with_stripped_type_parameters(spec, t::Type)
     ret = with_stripped_type_parameters_unchecked(spec, t)
     s = val_parameter(ret)
     s = s::UnionAll
-    s = s::Type{>:t}
+    s = s::(Type{T} where {T>:t})
     Val{s}()
 end
 
