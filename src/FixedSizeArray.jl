@@ -7,10 +7,10 @@ Implementation detail. Do not use.
 """
 struct Internal end
 
-struct FixedSizeArray{T,N,Mem<:GenericMemory{<:Any,T}} <: DenseArray{T,N}
+struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
     mem::Mem
     size::NTuple{N,Int}
-    function FixedSizeArray{T,N,M}(::Internal, mem::M, size::NTuple{N,Int}) where {T,N,M<:GenericMemory{<:Any,T}}
+    function FixedSizeArray{T,N,M}(::Internal, mem::M, size::NTuple{N,Int}) where {T,N,M<:DenseVector{T}}
         new{T,N,M}(mem, size)
     end
 end
@@ -133,7 +133,10 @@ An implementation detail of [`with_stripped_type_parameters`](@ref). Don't call
 directly.
 """
 function with_stripped_type_parameters_unchecked end
-
+function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Type{<:Vector})
+    s = Vector
+    Val{s}()
+end
 function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Type{<:(GenericMemory{K, T, AS} where {T})}) where {K, AS}
     s = GenericMemory{K, T, AS} where {T}
     Val{s}()
@@ -195,7 +198,7 @@ function check_count_value(n)
 end
 
 # TODO: use `SpecFSA` for implementing each `FixedSizeArray` constructor?
-struct SpecFSA{N,Mem<:GenericMemory} end
+struct SpecFSA{N,Mem<:DenseVector} end
 function fsa_spec_from_type(::Type{FixedSizeArray})
     SpecFSA{nothing,default_underlying_storage_type}()
 end
@@ -223,7 +226,7 @@ function fsa_spec_from_type(::Type{FixedSizeArray{E,M,V}}) where {E,M,V}
     V::Type{<:DenseVector{E}}
     SpecFSA{M,V}()
 end
-for V ∈ (Memory, AtomicMemory)
+for V ∈ (Vector, Memory, AtomicMemory)
     T = FixedSizeArray{E,M,V{E}} where {E,M}
     @eval begin
         function fsa_spec_from_type(::Type{$T})

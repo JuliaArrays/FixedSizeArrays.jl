@@ -120,7 +120,7 @@ end
         test_inferred(FixedSizeVector{Int}, return_type, arr)
     end
 
-    for storage_type ∈ (Memory,)
+    for storage_type ∈ (Memory, Vector)
         FSV = fsv(storage_type)
         FSM = fsm(storage_type)
         FSA = fsa(storage_type)
