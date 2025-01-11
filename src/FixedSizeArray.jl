@@ -26,7 +26,11 @@ end
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-const default_underlying_storage_type = Memory
+const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
+
+const optional_memory = (@isdefined Memory) ? (Memory,) : ()
+const optional_atomic_memory = (@isdefined AtomicMemory) ? (AtomicMemory,) : ()
+const optional_generic_memory = (@isdefined GenericMemory) ? (GenericMemory,) : ()
 
 function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
     FixedSizeArray{T,N,V}(Internal(), V(undef, checked_dims(size))::V, size)
@@ -137,6 +141,7 @@ function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::
     s = Vector
     Val{s}()
 end
+(@isdefined GenericMemory) &&
 function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Type{<:(GenericMemory{K, T, AS} where {T})}) where {K, AS}
     s = GenericMemory{K, T, AS} where {T}
     Val{s}()
@@ -226,7 +231,7 @@ function fsa_spec_from_type(::Type{FixedSizeArray{E,M,V}}) where {E,M,V}
     V::Type{<:DenseVector{E}}
     SpecFSA{M,V}()
 end
-for V ∈ (Vector, Memory, AtomicMemory)
+for V ∈ (Vector, optional_memory..., optional_atomic_memory...)
     T = FixedSizeArray{E,M,V{E}} where {E,M}
     @eval begin
         function fsa_spec_from_type(::Type{$T})
@@ -288,7 +293,7 @@ end
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::FixedSizeArray) = copyto2!(dst, src)
 
-for A ∈ (Array, GenericMemory)  # Add more? Too bad we have to hardcode to avoid ambiguity.
+for A ∈ (Array, optional_generic_memory...)  # Add more? Too bad we have to hardcode to avoid ambiguity.
     @eval begin
         Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::$A,             soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
         Base.@propagate_inbounds Base.copyto!(dst::$A,             doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
