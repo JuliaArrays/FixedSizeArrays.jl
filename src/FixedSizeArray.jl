@@ -7,10 +7,10 @@ Implementation detail. Do not use.
 """
 struct Internal end
 
-struct FixedSizeArray{T,N,Mem<:GenericMemory{<:Any,T}} <: DenseArray{T,N}
+struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
     mem::Mem
     size::NTuple{N,Int}
-    function FixedSizeArray{T,N,M}(::Internal, mem::M, size::NTuple{N,Int}) where {T,N,M<:GenericMemory{<:Any,T}}
+    function FixedSizeArray{T,N,M}(::Internal, mem::M, size::NTuple{N,Int}) where {T,N,M<:DenseVector{T}}
         new{T,N,M}(mem, size)
     end
 end
@@ -26,7 +26,11 @@ end
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-const default_underlying_storage_type = Memory
+const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
+
+const optional_memory = (@isdefined Memory) ? (Memory,) : ()
+const optional_atomic_memory = (@isdefined AtomicMemory) ? (AtomicMemory,) : ()
+const optional_generic_memory = (@isdefined GenericMemory) ? (GenericMemory,) : ()
 
 function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
     FixedSizeArray{T,N,V}(Internal(), V(undef, checked_dims(size))::V, size)
@@ -57,9 +61,28 @@ function FixedSizeArray{T}(::UndefInitializer, size::NTuple{N,Integer}) where {T
     FixedSizeArray{T,N}(undef, size)
 end
 
+macro assume_noub_if_noinbounds(x)
+    expr = :(
+        let f
+            Base.@assume_effects :noub_if_noinbounds f() = 7
+        end
+    )
+    effect_is_recognized = try
+        eval(expr)
+        true
+    catch
+        false
+    end
+    if effect_is_recognized
+        :(Base.@assume_effects :noub_if_noinbounds $x)
+    else
+        x
+    end
+end
+
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
 Base.@propagate_inbounds Base.getindex(A::FixedSizeArray, i::Int) = A.mem[i]
-Base.@propagate_inbounds Base.@assume_effects :noub_if_noinbounds function Base.setindex!(A::FixedSizeArray{T}, x, i::Int) where {T}
+Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray{T}, x, i::Int) where {T}
     @boundscheck checkbounds(A, i)
     @inbounds A.mem[i] = x
     return A
@@ -133,7 +156,11 @@ An implementation detail of [`with_stripped_type_parameters`](@ref). Don't call
 directly.
 """
 function with_stripped_type_parameters_unchecked end
-
+function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Type{<:Vector})
+    s = Vector
+    Val{s}()
+end
+(@isdefined GenericMemory) &&
 function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Type{<:(GenericMemory{K, T, AS} where {T})}) where {K, AS}
     s = GenericMemory{K, T, AS} where {T}
     Val{s}()
@@ -195,7 +222,7 @@ function check_count_value(n)
 end
 
 # TODO: use `SpecFSA` for implementing each `FixedSizeArray` constructor?
-struct SpecFSA{N,Mem<:GenericMemory} end
+struct SpecFSA{N,Mem<:DenseVector} end
 function fsa_spec_from_type(::Type{FixedSizeArray})
     SpecFSA{nothing,default_underlying_storage_type}()
 end
@@ -223,7 +250,7 @@ function fsa_spec_from_type(::Type{FixedSizeArray{E,M,V}}) where {E,M,V}
     V::Type{<:DenseVector{E}}
     SpecFSA{M,V}()
 end
-for V ∈ (Memory, AtomicMemory)
+for V ∈ (Vector, optional_memory..., optional_atomic_memory...)
     T = FixedSizeArray{E,M,V{E}} where {E,M}
     @eval begin
         function fsa_spec_from_type(::Type{$T})
@@ -285,7 +312,7 @@ end
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::FixedSizeArray) = copyto2!(dst, src)
 
-for A ∈ (Array, GenericMemory)  # Add more? Too bad we have to hardcode to avoid ambiguity.
+for A ∈ (Array, optional_generic_memory...)  # Add more? Too bad we have to hardcode to avoid ambiguity.
     @eval begin
         Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::$A,             soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
         Base.@propagate_inbounds Base.copyto!(dst::$A,             doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
@@ -298,6 +325,10 @@ end
 # unsafe: the native address of the array's storage
 
 Base.cconvert(::Type{<:Ptr}, a::FixedSizeArray) = a.mem
+
+function Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T}
+    Base.unsafe_convert(Ptr{T}, a.mem)
+end
 
 # `elsize`: part of the strided arrays interface, used for `pointer`
 

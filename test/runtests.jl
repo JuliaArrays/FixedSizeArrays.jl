@@ -17,7 +17,6 @@ const build_is_production_build = let v = get(ENV, build_is_production_build_env
 end::Bool
 
 const checked_dims = FixedSizeArrays.checked_dims
-const collect_as = FixedSizeArrays.collect_as
 
 # helpers for testing for allocation or suboptimal inference
 
@@ -104,6 +103,7 @@ end
 
     @testset "default underlying storage type" begin
         default = FixedSizeArrays.default_underlying_storage_type
+        @test default === (@isdefined(Memory) ? Memory : Vector)
         return_type = FixedSizeVector{Int,default{Int}}
         test_inferred(FixedSizeArray{Int}, return_type, (undef, 3))
         test_inferred(FixedSizeArray{Int}, return_type, (undef, (3,)))
@@ -120,7 +120,7 @@ end
         test_inferred(FixedSizeVector{Int}, return_type, arr)
     end
 
-    for storage_type ∈ (Memory,)
+    for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
         FSV = fsv(storage_type)
         FSM = fsm(storage_type)
         FSA = fsa(storage_type)
@@ -347,10 +347,15 @@ end
         @testset "`copyto!`" begin
             for (D, S) ∈ (
                 (Vector, FSV),
-                (Memory, FSV),
                 (FSV, Vector),
-                (FSV, Memory),
                 (FSV, FSV),
+                (
+                    if @isdefined Memory
+                        ((FSV, Memory), (Memory, FSV))
+                    else
+                        ()
+                    end
+                )...,
             )
                 for E ∈ (Float64, Int)
                     s = S{E}(undef, 5)
@@ -474,7 +479,7 @@ end
                     @test a == fsa
                     @test first(abstract_array_params(fsa)) <: E
                 end
-                for T ∈ (FSA, FSA{<:Any,dim_count}, FixedSizeArray{<:Any,dim_count})
+                for T ∈ (FSA, FSA{<:Any,dim_count})
                     @test collect_as(T, iterator) isa FSA{E,dim_count}
                     fsa = collect_as(T, iterator)
                     @test a == fsa
@@ -485,6 +490,12 @@ end
                     fsa = collect_as(T, iterator)
                     @test af == fsa
                     @test first(abstract_array_params(fsa)) <: Float64
+                end
+                for T ∈ (FixedSizeArray{<:Any,dim_count},)
+                    @test collect_as(T, iterator) isa FixedSizeArray{E,dim_count}
+                    fsa = collect_as(T, iterator)
+                    @test a == fsa
+                    @test first(abstract_array_params(fsa)) <: E
                 end
             end
         end

@@ -1,7 +1,7 @@
 [compat]
 Aqua = "0.8"
 OffsetArrays = "1.14"
-Test = "1.11"
+Test = "1.10"
 
 [deps]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
