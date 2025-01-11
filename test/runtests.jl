@@ -120,7 +120,7 @@ end
         test_inferred(FixedSizeVector{Int}, return_type, arr)
     end
 
-    for storage_type ∈ (Memory, Vector)
+    for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
         FSV = fsv(storage_type)
         FSM = fsm(storage_type)
         FSA = fsa(storage_type)
@@ -347,10 +347,15 @@ end
         @testset "`copyto!`" begin
             for (D, S) ∈ (
                 (Vector, FSV),
-                (Memory, FSV),
                 (FSV, Vector),
-                (FSV, Memory),
                 (FSV, FSV),
+                (
+                    if @isdefined Memory
+                        ((FSV, Memory), (Memory, FSV))
+                    else
+                        ()
+                    end
+                )...,
             )
                 for E ∈ (Float64, Int)
                     s = S{E}(undef, 5)
