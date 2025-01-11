@@ -103,6 +103,7 @@ end
 
     @testset "default underlying storage type" begin
         default = FixedSizeArrays.default_underlying_storage_type
+        @test default === Memory skip=(!@isdefined Memory;)
         return_type = FixedSizeVector{Int,default{Int}}
         test_inferred(FixedSizeArray{Int}, return_type, (undef, 3))
         test_inferred(FixedSizeArray{Int}, return_type, (undef, (3,)))
