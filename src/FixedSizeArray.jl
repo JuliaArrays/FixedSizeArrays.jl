@@ -82,7 +82,7 @@ end
 
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
 Base.@propagate_inbounds Base.getindex(A::FixedSizeArray, i::Int) = A.mem[i]
-Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray{T}, x, i::Int) where {T}
+Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray, x, i::Int)
     @boundscheck checkbounds(A, i)
     @inbounds A.mem[i] = x
     return A
