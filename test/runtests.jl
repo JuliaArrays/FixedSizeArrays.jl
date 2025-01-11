@@ -478,7 +478,7 @@ end
                     @test a == fsa
                     @test first(abstract_array_params(fsa)) <: E
                 end
-                for T ∈ (FSA, FSA{<:Any,dim_count}, FixedSizeArray{<:Any,dim_count})
+                for T ∈ (FSA, FSA{<:Any,dim_count})
                     @test collect_as(T, iterator) isa FSA{E,dim_count}
                     fsa = collect_as(T, iterator)
                     @test a == fsa
@@ -489,6 +489,12 @@ end
                     fsa = collect_as(T, iterator)
                     @test af == fsa
                     @test first(abstract_array_params(fsa)) <: Float64
+                end
+                for T ∈ (FixedSizeArray{<:Any,dim_count},)
+                    @test collect_as(T, iterator) isa FixedSizeArray{E,dim_count}
+                    fsa = collect_as(T, iterator)
+                    @test a == fsa
+                    @test first(abstract_array_params(fsa)) <: E
                 end
             end
         end
