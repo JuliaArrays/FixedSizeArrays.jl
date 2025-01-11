@@ -1,4 +1,4 @@
-public collect_as
+export collect_as
 
 function collect_as_fsa0(iterator, ::SpecFSA{0,V}) where {V}
     V::UnionAll

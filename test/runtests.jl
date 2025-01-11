@@ -17,7 +17,6 @@ const build_is_production_build = let v = get(ENV, build_is_production_build_env
 end::Bool
 
 const checked_dims = FixedSizeArrays.checked_dims
-const collect_as = FixedSizeArrays.collect_as
 
 # helpers for testing for allocation or suboptimal inference
 
