@@ -61,9 +61,28 @@ function FixedSizeArray{T}(::UndefInitializer, size::NTuple{N,Integer}) where {T
     FixedSizeArray{T,N}(undef, size)
 end
 
+macro assume_noub_if_noinbounds(x)
+    expr = :(
+        let f
+            Base.@assume_effects :noub_if_noinbounds f() = 7
+        end
+    )
+    effect_is_recognized = try
+        eval(expr)
+        true
+    catch
+        false
+    end
+    if effect_is_recognized
+        :(Base.@assume_effects :noub_if_noinbounds $x)
+    else
+        x
+    end
+end
+
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
 Base.@propagate_inbounds Base.getindex(A::FixedSizeArray, i::Int) = A.mem[i]
-Base.@propagate_inbounds Base.@assume_effects :noub_if_noinbounds function Base.setindex!(A::FixedSizeArray{T}, x, i::Int) where {T}
+Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray{T}, x, i::Int) where {T}
     @boundscheck checkbounds(A, i)
     @inbounds A.mem[i] = x
     return A
