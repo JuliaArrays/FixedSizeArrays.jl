@@ -145,10 +145,10 @@ function Base.BroadcastStyle(::Type{<:(FixedSizeArray{T, N, Mem} where {T})}) wh
 end
 
 function Base.similar(
-    bc::(Broadcast.Broadcasted{FixedSizeArrayBroadcastStyle{N, Mem}} where {N}),
+    bc::Broadcast.Broadcasted{FixedSizeArrayBroadcastStyle{N, Mem}},
     ::Type{E},
-) where {Mem,E}
-    similar((FixedSizeArray{E, N, Mem{E}} where {N}), axes(bc))
+) where {N,Mem,E}
+    similar(FixedSizeArray{E, N, Mem{E}}, axes(bc))
 end
 
 # helper functions
