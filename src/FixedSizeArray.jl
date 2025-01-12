@@ -130,16 +130,25 @@ end
 
 # broadcasting
 
-function Base.BroadcastStyle(::Type{T}) where {T<:FixedSizeArray}
-    spec = TypeParametersElementTypeAndDimensionality()
-    Broadcast.ArrayStyle{val_parameter(with_stripped_type_parameters(spec, T))}()
+struct FixedSizeArrayBroadcastStyle{N, Mem <: DenseVector} <: Broadcast.AbstractArrayStyle{N} end
+
+function (::Type{<:(FixedSizeArrayBroadcastStyle{N, Mem} where {N})})(::Val{M}) where {Mem, M}
+    m = check_count_value(M)
+    FixedSizeArrayBroadcastStyle{m, Mem}()  # `FixedSizeArray` supports any dimensionality
+end
+
+function Base.BroadcastStyle(::Type{<:(FixedSizeArray{T, N, Mem} where {T})}) where {N, Mem}
+    n = check_count_value(N)
+    spec = TypeParametersElementType()
+    mem = val_parameter(with_stripped_type_parameters(spec, Mem))
+    FixedSizeArrayBroadcastStyle{n, mem}()
 end
 
 function Base.similar(
-    bc::Broadcast.Broadcasted{Broadcast.ArrayStyle{S}},
+    bc::Broadcast.Broadcasted{FixedSizeArrayBroadcastStyle{N, Mem}},
     ::Type{E},
-) where {S<:FixedSizeArray,E}
-    similar(S{E}, axes(bc))
+) where {N,Mem,E}
+    similar(FixedSizeArray{E, N, Mem{E}}, axes(bc))
 end
 
 # helper functions
@@ -212,13 +221,12 @@ length_status(::Base.SizeUnknown) = LengthIsUnknown()
 length_status(::Base.HasLength) = LengthIsKnown()
 length_status(::Base.HasShape) = LengthIsKnown()
 
-function check_count_value(n::Int)
+function check_count_value(n)
+    n = n::Int
     if n < 0
         throw(ArgumentError("count can't be negative"))
     end
-end
-function check_count_value(n)
-    throw(ArgumentError("count must be an `Int`"))
+    n
 end
 
 # TODO: use `SpecFSA` for implementing each `FixedSizeArray` constructor?

@@ -58,6 +58,13 @@ function fsv(vec_type::Type{<:DenseVector})
     fsa(vec_type){T,1} where {T}
 end
 
+function test_we_do_not_own_the_call(func, arg_types)
+    function f(method)
+        FixedSizeArrays != parentmodule(method)
+    end
+    @test all(f, methods(func, arg_types))
+end
+
 @testset "FixedSizeArrays" begin
     @testset "meta" begin
         @test isempty(detect_ambiguities(Main))  # test for ambiguities in this file
@@ -65,6 +72,12 @@ end
 
     @testset "Aqua.jl" begin
         Aqua.test_all(FixedSizeArrays)
+    end
+
+    @testset "type piracy" begin
+        @testset "issue #77: type piracy of `similar`" begin
+            test_we_do_not_own_the_call(similar, Tuple{Broadcast.Broadcasted{Broadcast.ArrayStyle{Union{}}}, Type{Int}})
+        end
     end
 
     @testset "safe computation of length from dimensions size" begin
@@ -443,10 +456,8 @@ end
                     @test_throws ArgumentError collect_as(T, iterator)
                 end
             end
-            for T ∈ (FSA{Int,-1}, FSA{Int,3.1})
-                iterator = (7:8, (7, 8))
-                @test_throws ArgumentError collect_as(T, iterator)
-            end
+            @test_throws ArgumentError collect_as(FSA{Int, -1}, 7:8)
+            @test_throws TypeError collect_as(FSA{Int, 3.1}, 7:8)
             for T ∈ (FSA{3}, FSV{3})
                 iterator = (7:8, (7, 8))
                 @test_throws TypeError collect_as(T, iterator)
