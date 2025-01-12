@@ -1,4 +1,6 @@
-export FixedSizeArray, FixedSizeVector, FixedSizeMatrix
+export
+    FixedSizeArray, FixedSizeVector, FixedSizeMatrix,
+    FixedSizeArrayDefault, FixedSizeVectorDefault, FixedSizeMatrixDefault
 
 """
     Internal()
@@ -351,3 +353,7 @@ function Base.reshape(a::FixedSizeArray{T,<:Any,V}, size::NTuple{N,Int}) where {
     end
     FixedSizeArray{T,N,V}(Internal(), a.mem, size)
 end
+
+const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_type{T}} where {T, N}
+const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
+const FixedSizeMatrixDefault = FixedSizeArrayDefault{T, 2} where {T}

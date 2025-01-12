@@ -80,6 +80,23 @@ end
         end
     end
 
+    @testset "type aliases" begin
+        @test FixedSizeArrayDefault <: FixedSizeArray
+        @test FixedSizeVectorDefault <: FixedSizeVector
+        @test FixedSizeMatrixDefault <: FixedSizeMatrix
+        for et ∈ (Float32, Int, String)
+            @test FixedSizeArrayDefault{et} <: FixedSizeArray{et}
+            @test FixedSizeVectorDefault{et} <: FixedSizeVector{et}
+            @test FixedSizeMatrixDefault{et} <: FixedSizeMatrix{et}
+            @test FixedSizeArrayDefault{et, 0} <: FixedSizeArray{et, 0}
+            for t ∈ (
+                FixedSizeVectorDefault{et}, FixedSizeMatrixDefault{et}, FixedSizeArrayDefault{et, 0},
+            )
+                @test isconcretetype(t)
+            end
+        end
+    end
+
     @testset "safe computation of length from dimensions size" begin
         @test isone(checked_dims(()))
         for n ∈ 0:30
