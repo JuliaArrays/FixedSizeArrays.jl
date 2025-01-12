@@ -2,17 +2,10 @@ export
     FixedSizeArray, FixedSizeVector, FixedSizeMatrix,
     FixedSizeArrayDefault, FixedSizeVectorDefault, FixedSizeMatrixDefault
 
-"""
-    Internal()
-
-Implementation detail. Do not use.
-"""
-struct Internal end
-
 struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
     mem::Mem
     size::NTuple{N,Int}
-    function FixedSizeArray{T,N,M}(::Internal, mem::M, size::NTuple{N,Int}) where {T,N,M<:DenseVector{T}}
+    global function new_fixed_size_array(mem::M, size::NTuple{N,Int}) where {T,N,M<:DenseVector{T}}
         new{T,N,M}(mem, size)
     end
 end
@@ -29,7 +22,7 @@ const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
 function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
-    FixedSizeArray{T,N,V}(Internal(), V(undef, checked_dims(size))::V, size)
+    new_fixed_size_array(V(undef, checked_dims(size))::V, size)
 end
 function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N,V}
     ints = map(Int, size)::NTuple{N,Int}  # prevent infinite recursion
@@ -340,12 +333,12 @@ Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
 
 # `reshape`: specializing it to ensure it returns a `FixedSizeArray`
 
-function Base.reshape(a::FixedSizeArray{T,<:Any,V}, size::NTuple{N,Int}) where {V,T,N}
+function Base.reshape(a::FixedSizeArray, size::(NTuple{N,Int} where {N}))
     len = checked_dims(size)
     if length(a) != len
         throw(DimensionMismatch("new shape not consistent with existing array length"))
     end
-    FixedSizeArray{T,N,V}(Internal(), a.mem, size)
+    new_fixed_size_array(a.mem, size)
 end
 
 const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_type{T}} where {T, N}
