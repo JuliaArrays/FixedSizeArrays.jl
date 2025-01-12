@@ -1,5 +1,11 @@
 module FixedSizeArrays
 
+const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
+
+const optional_memory = (@isdefined Memory) ? (Memory,) : ()
+const optional_atomic_memory = (@isdefined AtomicMemory) ? (AtomicMemory,) : ()
+const optional_generic_memory = (@isdefined GenericMemory) ? (GenericMemory,) : ()
+
 include("FixedSizeArray.jl")
 
 if isdefined(Base, :dataids) && (Base.dataids isa Function)

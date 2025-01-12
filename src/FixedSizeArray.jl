@@ -28,12 +28,6 @@ end
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
-
-const optional_memory = (@isdefined Memory) ? (Memory,) : ()
-const optional_atomic_memory = (@isdefined AtomicMemory) ? (AtomicMemory,) : ()
-const optional_generic_memory = (@isdefined GenericMemory) ? (GenericMemory,) : ()
-
 function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
     FixedSizeArray{T,N,V}(Internal(), V(undef, checked_dims(size))::V, size)
 end
