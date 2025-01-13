@@ -4,6 +4,46 @@ function throw_bottom_type()
     throw(ArgumentError("`Union{}` not expected"))
 end
 
+function collect_as_storage_type_helper(::Type{Storage}, ::Type{E}) where {S, Storage <: AbstractVector{S}, E}
+    Storage
+end
+function collect_as_storage_type_helper(::Type{Storage}, ::Type{E}) where {Storage <: AbstractVector, E}
+    Storage{E}
+end
+
+function collect_as_vector_type_helper(::Type{V}, elems::Tuple) where {V <: AbstractVector}
+    collect_as_storage_type_helper(V, eltype(elems))
+end
+
+function make_abstract_vector_from_tuple(::Type{V}, elems::Tuple) where {E, V <: AbstractVector{E}}
+    ret = V(undef, length(elems))
+    copyto!(ret, elems)
+end
+
+function fsv_type_from_underlying_storage_type(::Type{V}) where {E, V <: DenseVector{E}}
+    FixedSizeVector{E, V}
+end
+
+function vector_type_from_underlying_storage_type(::Type{V}) where {E, V <: AbstractVector{E}}
+    Vector{E}
+end
+
+function collect_as_return_type_helper(::Type{Storage}, ::Type{Vector{E}}) where {Storage <: AbstractVector, E}
+    fsv_type_from_underlying_storage_type(collect_as_storage_type_helper(Storage, E))
+end
+
+function make_fsv_from_tuple(::Type{V}, elems::Tuple) where {V <: DenseVector}
+    stor = collect_as_vector_type_helper(V, elems)
+    ret_type = fsv_type_from_underlying_storage_type(stor)
+    make_abstract_vector_from_tuple(ret_type, elems)
+end
+
+function make_vector_from_tuple(::Type{V}, elems::Tuple) where {V <: DenseVector}
+    stor = collect_as_vector_type_helper(V, elems)
+    ret_type = vector_type_from_underlying_storage_type(stor)
+    make_abstract_vector_from_tuple(ret_type, elems)
+end
+
 function parent_type_with_default(::Type{<:(FixedSizeArray{E, N, T} where {N})}) where {E, T <: DenseVector{E}}
     T
 end
@@ -25,22 +65,15 @@ for T ∈ (Vector, optional_memory...)
     end
 end
 
-function push_vector(::Type{V}, v, e) where {V <: AbstractVector}
-    ret = V(undef, length(v) + 1)
-    copyto!(ret, v)
+function push!!(v::Vector{E}, e::E) where {E}
+    push!(v, e)
+end
+function push!!(v::Vector, e)
+    E = typejoin(typeof(e), eltype(v))
+    ret = Vector{E}(undef, length(v) + 1)
+    ret = copyto!(ret, v)
     ret[end] = e
     ret
-end
-
-function push_fsv(::Type{V}, v, e) where {E, V <: DenseVector{E}}
-    FSV = FixedSizeVector{E, V}
-    push_vector(FSV, v, e)
-end
-
-function push_fsv(::Type{V}, v, e) where {V <: DenseVector}
-    E = typejoin(typeof(e), eltype(v))
-    FSV = FixedSizeVector{E, V{E}}
-    push_vector(FSV, v, e)
 end
 
 function empty_fsv(::Type{V}, ::Any) where {E, V <: DenseVector{E}}
@@ -65,22 +98,23 @@ function collect_as_fsv(::Type{V}, iterator) where {V <: DenseVector}
     if es1 isa T2
         let (e1, s1) = es1, es2 = iterate(iterator, s1)
             if es2 isa T2
-                let (e2, s2) = es2, state = s2, ret = push_fsv(V, (e1,), e2)
+                let (e2, s2) = es2, state = s2, ret = make_vector_from_tuple(V, (e1, e2))
                     while true
                         es = iterate(iterator, state)
                         if es isa T2
                             let (e, s) = es
                                 state = s
-                                ret = push_fsv(V, ret, e)
+                                ret = push!!(ret, e)
                             end
                         else
                             break
                         end
                     end
-                    ret
+                    ret_type = collect_as_return_type_helper(V, typeof(ret))
+                    ret_type(ret)
                 end
             else
-                push_fsv(V, (), e1)
+                make_fsv_from_tuple(V, (e1,))
             end
         end
     else
