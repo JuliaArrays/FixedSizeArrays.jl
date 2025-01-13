@@ -65,15 +65,25 @@ for T ∈ (Vector, optional_memory...)
     end
 end
 
-function push!!(v::Vector{E}, e::E) where {E}
-    push!(v, e)
-end
-function push!!(v::Vector, e)
+function push(v::Vector, e)
     E = typejoin(typeof(e), eltype(v))
     ret = Vector{E}(undef, length(v) + 1)
     ret = copyto!(ret, v)
     ret[end] = e
     ret
+end
+
+function push!!(::Type{<:AbstractVector{E}}, v::Vector{E}, e::E) where {E}
+    push!(v, e)
+end
+function push!!(::Type{<:AbstractVector{E}}, v::Vector{E}, e) where {E}
+    push!(v, e)
+end
+function push!!(::Type{<:AbstractVector}, v::Vector{E}, e::E) where {E}
+    push!(v, e)
+end
+function push!!(::Type{<:AbstractVector}, v::Vector, e)
+    push(v, e)
 end
 
 function empty_fsv(::Type{V}, ::Any) where {E, V <: DenseVector{E}}
@@ -104,7 +114,7 @@ function collect_as_fsv(::Type{V}, iterator) where {V <: DenseVector}
                         if es isa T2
                             let (e, s) = es
                                 state = s
-                                ret = push!!(ret, e)
+                                ret = push!!(V, ret, e)
                             end
                         else
                             break
