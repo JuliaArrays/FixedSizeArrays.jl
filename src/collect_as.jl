@@ -157,5 +157,5 @@ function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
         fsv
     else
         reshape(fsv, size(iterator))
-    end
+    end::T
 end
