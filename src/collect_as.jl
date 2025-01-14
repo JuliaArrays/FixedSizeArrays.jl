@@ -81,16 +81,16 @@ function push!!(::Type{<:AbstractVector}, v::Vector, e)
 end
 
 function empty_fsv(::Type{V}, ::Any) where {E, V <: DenseVector{E}}
-    FixedSizeVector{E, V}(undef, 0)
+    fsv_type_from_underlying_storage_type(V)(undef, 0)
 end
 
 function empty_fsv(::Type{V}, iterator) where {V <: DenseVector}
     let E = eltype(iterator)
         if isconcretetype(E)
-            FixedSizeVector{E, V{E}}(undef, 0)
+            fsv_type_from_underlying_storage_type(V{E})(undef, 0)
         else
             let E = Union{}
-                FixedSizeVector{E, V{E}}(undef, 0)
+                fsv_type_from_underlying_storage_type(V{E})(undef, 0)
             end
         end
     end
