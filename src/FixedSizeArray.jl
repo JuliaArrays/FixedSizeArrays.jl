@@ -348,6 +348,15 @@ function Base.reshape(a::FixedSizeArray{T,<:Any,V}, size::NTuple{N,Int}) where {
     FixedSizeArray{T,N,V}(Internal(), a.mem, size)
 end
 
+# `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods
+
+function Base.iterate(a::FixedSizeArray)
+    iterate(a.mem)
+end
+function Base.iterate(a::FixedSizeArray, state)
+    iterate(a.mem, state)
+end
+
 const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_type{T}} where {T, N}
 const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
 const FixedSizeMatrixDefault = FixedSizeArrayDefault{T, 2} where {T}
