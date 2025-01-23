@@ -468,6 +468,18 @@ end
         end
 
         @testset "`collect_as`" begin
+            @testset "difficult requested return type" begin
+                T = FixedSizeVectorDefault{T} where {T <: Float32}
+                iter = 3:7
+                returns = try
+                    collect_as(T, iter)
+                    true
+                catch e
+                    (e isa TypeError) || rethrow()
+                    false
+                end
+                returns && @test collect_as(T, iter) isa T
+            end
             @testset "empty iterator with inexact `eltype`" begin
                 iterator = Iterators.map((x -> x + 0.3), [])
                 @test collect_as(FSV, iterator) isa FSV{Union{}}
