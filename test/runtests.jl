@@ -471,6 +471,7 @@ end
             @testset "difficult requested return type" begin
                 T = FixedSizeVectorDefault{T} where {T <: Float32}
                 iter = 3:7
+                # either return a value of the requested type or throw
                 returns = try
                     collect_as(T, iter)
                     true
