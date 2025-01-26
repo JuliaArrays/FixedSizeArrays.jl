@@ -84,6 +84,19 @@ function empty_fsv(::Type{V}, iterator) where {V <: DenseVector}
     end
 end
 
+"""
+    collect_as_fsv(V::Type{<:DenseVector}, iterator)
+
+Collect the elements of `iterator` into a `FixedSizeVector`. The argument `V`
+specifies the underlying storage type parameter of this `FixedSizeVector`. When
+possible, the element type of the return value is also taken from `V`, otherwise it
+is determined by the types of the elements of the iterator.
+
+When `V` does not provide an element type and `isempty(iterator)`, the element type
+of the return value is:
+* `eltype(iterator)`, when it's a concrete type
+* `Union{}`, otherwise
+"""
 function collect_as_fsv(::Type{V}, iterator) where {V <: DenseVector}
     es1 = iterate(iterator)  # unroll a bit to avoid unnecessary allocations and help inference
     T2 = Tuple{Any, Any}
