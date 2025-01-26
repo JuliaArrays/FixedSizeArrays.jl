@@ -4,7 +4,7 @@ function throw_bottom_type()
     throw(ArgumentError("`Union{}` not expected"))
 end
 
-function collect_as_storage_type_helper(::Type{Storage}, ::Type{E}) where {S, Storage <: AbstractVector{S}, E}
+function collect_as_storage_type_helper(::Type{Storage}, ::Type) where {S, Storage <: AbstractVector{S}}
     Storage
 end
 function collect_as_storage_type_helper(::Type{Storage}, ::Type{E}) where {Storage <: AbstractVector, E}
