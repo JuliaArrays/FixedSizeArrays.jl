@@ -162,7 +162,7 @@ function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
     output_dimension_count = checked_dimension_count_of(T, size_class)
     fsv = collect_as_fsv(mem, iterator)
     if isone(output_dimension_count)
-        fsv  # `size(iterator)` may throw in this branch so don't call it
+        fsv  # `size(iterator)` may throw in this branch
     else
         reshape(fsv, size(iterator))
     end::T
