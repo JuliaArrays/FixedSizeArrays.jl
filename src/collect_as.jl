@@ -93,10 +93,10 @@ end
 """
     collect_as_fsv(V::Type{<:DenseVector}, iterator)::FixedSizeVector
 
-Collect the elements of `iterator` into a `FixedSizeVector`. The argument `V`
-specifies the underlying storage type parameter of this `FixedSizeVector`. When
-possible, the element type of the return value is also taken from `V`, otherwise it
-is determined by the types of the elements of the iterator.
+Collect the elements of `iterator` into a `FixedSizeVector`, `r`. The argument `V`
+specifies the underlying storage type parameter of `r`. When possible (specified as
+a parameter in `V`), `eltype(r)` is also taken from `V`, otherwise it is determined
+by the types of the elements of the iterator.
 
 When `V` does not provide an element type and `isempty(iterator)`, the element type
 of the return value is:
