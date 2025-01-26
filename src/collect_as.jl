@@ -11,10 +11,6 @@ function collect_as_storage_type_helper(::Type{Storage}, ::Type{E}) where {Stora
     Storage{E}
 end
 
-function collect_as_vector_type_helper(::Type{V}, elems::Tuple) where {V <: AbstractVector}
-    collect_as_storage_type_helper(V, eltype(elems))
-end
-
 function make_abstract_vector_from_tuple(::Type{V}, elems::Tuple) where {E, V <: AbstractVector{E}}
     ret = V(undef, length(elems))
     copyto!(ret, elems)
@@ -29,7 +25,7 @@ function collect_as_return_type_helper(::Type{Storage}, ::Type{Vector{E}}) where
 end
 
 function make_vector_from_tuple(::Type{V}, elems::Tuple) where {V <: DenseVector}
-    stor = collect_as_vector_type_helper(V, elems)
+    stor = collect_as_storage_type_helper(V, eltype(elems))
     ret_type = Vector{eltype(stor)}
     make_abstract_vector_from_tuple(ret_type, elems)
 end
