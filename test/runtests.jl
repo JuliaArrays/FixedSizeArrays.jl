@@ -3,6 +3,21 @@ using FixedSizeArrays
 using OffsetArrays: OffsetArray
 import Aqua
 
+struct Three <: Integer end
+struct Seven <: Integer end
+Base.Int(::Three) = 3
+Base.Int(::Seven) = 7
+Base.promote_rule(::Type{Int}, ::Type{Three}) = Int
+Base.promote_rule(::Type{Int}, ::Type{Seven}) = Int
+Base.promote_rule(::Type{Three}, ::Type{Int}) = Int
+Base.promote_rule(::Type{Seven}, ::Type{Int}) = Int
+Base.zero(::Union{Three, Seven}) = false
+Base.zero(::Type{<:Union{Three, Seven}}) = false
+Base.one(::Union{Three, Seven}) = true
+Base.one(::Type{<:Union{Three, Seven}}) = true
+Base.iszero(::Union{Three, Seven}) = false
+Base.isone(::Union{Three, Seven}) = false
+
 # Check if the compilation options allow maximum performance.
 const build_is_production_build_env_name = "BUILD_IS_PRODUCTION_BUILD"
 const build_is_production_build = let v = get(ENV, build_is_production_build_env_name, "true")
@@ -49,7 +64,7 @@ end
 # helpers for constructing the type constructors
 
 function fsa(vec_type::Type{<:DenseVector})
-    FixedSizeArray{T,N,vec_type{T}} where {T,N}
+    FixedSizeArray{T,N,vec_type{T},NTuple{N,Int}} where {T,N}
 end
 function fsm(vec_type::Type{<:DenseVector})
     fsa(vec_type){T,2} where {T}
@@ -78,6 +93,35 @@ end
         @testset "issue #77: type piracy of `similar`" begin
             test_we_do_not_own_the_call(similar, Tuple{Broadcast.Broadcasted{Broadcast.ArrayStyle{Union{}}}, Type{Int}})
         end
+    end
+
+    @testset "various dim size types" begin
+        for Mem ∈ (Vector, ((@isdefined Memory) ? (Memory,) : ())...)
+            for siz ∈ ((3, 7), (3, Seven()), (Three(), 7), (Three(), Seven()))
+                elt = Float32
+                Mem_elt = Mem{elt}
+                requested_type = FixedSizeArray{elt, <:Any, Mem_elt}
+                return_type = FixedSizeArray{elt, length(siz), Mem_elt, typeof(siz)}
+                for args ∈ ((undef, siz), (undef, siz...))
+                    test_inferred(requested_type, return_type, args)
+                    a = FixedSizeArray{elt}(args...)
+                    @test siz === @inferred size(a)
+                end
+            end
+            let a = FixedSizeArray{Float32}(undef, (big(3), big(7)))
+                @test (3, 7) === @inferred size(a)
+            end
+            let a = FixedSizeArray{Float32}(undef, (big(3), Seven()))
+                @test (3, Seven()) === @inferred size(a)
+            end
+        end
+    end
+
+    @testset "ndims type safety" begin
+        @test_throws TypeError FixedSizeArray{<:Any, Int}
+        @test_throws TypeError FixedSizeArray{<:Any, Union{}}
+        @test_throws TypeError FixedSizeArray{<:Any, Int32(0)}
+        @test_throws Exception FixedSizeArray{<:Any, -1}
     end
 
     @testset "type aliases" begin
@@ -135,7 +179,7 @@ end
     @testset "default underlying storage type" begin
         default = FixedSizeArrays.default_underlying_storage_type
         @test default === (@isdefined(Memory) ? Memory : Vector)
-        return_type = FixedSizeVector{Int,default{Int}}
+        return_type = FixedSizeVector{Int,default{Int},Tuple{Int}}
         @test return_type === FixedSizeVectorDefault{Int}
         test_inferred(FixedSizeArray{Int}, return_type, (undef, 3))
         test_inferred(FixedSizeArray{Int}, return_type, (undef, (3,)))
@@ -507,16 +551,12 @@ end
             end
             @testset "`Union{}`" begin
                 @test_throws Exception collect_as(Union{}, ())
-                @test_throws Exception collect_as(FixedSizeVector{Union{}, Union{}}, ())
-                @test_throws Exception collect_as(FixedSizeVector{<:Any, Union{}}, ())
             end
             for T ∈ (FSA{Int}, FSV{Int})
                 for iterator ∈ (Iterators.repeated(7), Iterators.cycle(7))
                     @test_throws ArgumentError collect_as(T, iterator)
                 end
             end
-            @test_throws ArgumentError collect_as(FSA{Int, -1}, 7:8)
-            @test_throws TypeError collect_as(FSA{Int, 3.1}, 7:8)
             for T ∈ (FSA{3}, FSV{3})
                 iterator = (7:8, (7, 8))
                 @test_throws TypeError collect_as(T, iterator)

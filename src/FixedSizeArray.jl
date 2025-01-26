@@ -2,11 +2,39 @@ export
     FixedSizeArray, FixedSizeVector, FixedSizeMatrix,
     FixedSizeArrayDefault, FixedSizeVectorDefault, FixedSizeMatrixDefault
 
-struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
+function normalized_dim_int(x::Integer)
+    Int(x)::Int
+end
+
+function normalized_dim_integer(x::Integer)
+    if Base.issingletontype(typeof(x))
+        x
+    else
+        normalized_dim_int(x)
+    end
+end
+
+const NormalizedDim = Union{typeof(normalized_dim_int), typeof(normalized_dim_integer)}
+
+function normalized_dims(::NormalizedDim, ::Tuple{})
+    ()
+end
+function normalized_dims(normalized_dim::NormalizedDim, x::Tuple{Integer, Vararg{Integer}})
+    i_tail = Base.tail(x)
+    o_tail = normalized_dims(normalized_dim, i_tail)
+    f = normalized_dim(first(x))
+    (f, o_tail...)
+end
+function normalized_dims(::NormalizedDim, x::Tuple{Int, Vararg{Int}})
+    x
+end
+
+struct FixedSizeArray{T,N,Mem<:DenseVector{T},Size<:NTuple{N,Integer}} <: DenseArray{T,N}
     mem::Mem
-    size::NTuple{N,Int}
-    global function new_fixed_size_array(mem::DenseVector{T}, size::NTuple{N,Int}) where {T,N}
-        new{T,N,typeof(mem)}(mem, size)
+    size::Size
+    global function new_fixed_size_array(mem::DenseVector{T}, size::NTuple{N,Integer}) where {T,N}
+        s = normalized_dims(normalized_dim_integer, size)
+        new{T,N,typeof(mem),typeof(s)}(mem, s)
     end
 end
 
@@ -23,25 +51,38 @@ const FixedSizeArrayAllowedConstructorType = let
         Union{
             # 0 fixed parameters
             Type{FixedSizeArray{T, N, Mem{T}} where {T, N}},
+            Type{FixedSizeArray{T, N, Mem{T}, NTuple{N, Int}} where {T, N}},
+            Type{FixedSizeArray{T, N, Mem{T}, Size} where {T, N, Size <: NTuple{N, Integer}}},
             # 1 fixed parameter
             Type{FixedSizeArray{T, N, Mem{T}} where {N}} where {T},
             Type{FixedSizeArray{T, N, Mem{T}} where {T}} where {N},
+            Type{FixedSizeArray{T, N, Mem{T}, NTuple{N, Int}} where {N}} where {T},
             # 2 fixed parameters
             Type{FixedSizeArray{T, N, Mem{T}}} where {T, N},
+            Type{FixedSizeArray{T, N, Mem{T}, Size} where {T}} where {N, Size <: NTuple{N, Integer}},
+            # 3 fixed parameters
+            Type{FixedSizeArray{T, N, Mem{T}, Size}} where {T, N, Size <: NTuple{N, Integer}},
         }
     end
     special_storage_types = (Vector, optional_memory...)
     Union{
         # 0 fixed parameters
         Type{FixedSizeArray},
+        Type{FixedSizeArray{T, N, Mem, NTuple{N, Int}} where {T, N, Mem <: DenseVector{T}}},
         # 1 fixed parameter
         Type{FixedSizeArray{T}} where {T},
         Type{FixedSizeArray{T, N} where {T}} where {N},
+        Type{FixedSizeArray{T, N, Mem, NTuple{N, Int}} where {N, Mem <: DenseVector{T}}} where {T},
         # 2 fixed parameters
         Type{FixedSizeArray{T, N}} where {T, N},
         Type{FixedSizeArray{T, N, Mem} where {N}} where {T, Mem <: DenseVector{T}},
+        Type{FixedSizeArray{T, N, Mem, NTuple{N, Int}} where {N}} where {T, Mem <: DenseVector{T}},
+        Type{FixedSizeArray{T, N, Mem, Size} where {T, Mem <: DenseVector{T}}} where {N, Size <: NTuple{N, Integer}},
         # 3 fixed parameters
         Type{FixedSizeArray{T, N, Mem}} where {T, N, Mem <: DenseVector{T}},
+        Type{FixedSizeArray{T, N, Mem, Size} where {Mem <: DenseVector{T}}} where {T, N, Size <: NTuple{N, Integer}},
+        # 4 fixed parameters
+        Type{FixedSizeArray{T, N, Mem, Size}} where {T, N, Mem <: DenseVector{T}, Size <: NTuple{N, Integer}},
         # special cases depending on the underlying storage type
         map(f, special_storage_types)...,
     }
@@ -68,10 +109,12 @@ function parent_type_with_default(::Type{<:FixedSizeArray})
     default_underlying_storage_type
 end
 for Mem ∈ (Vector, optional_memory...)
-    FSA = FixedSizeArray{T, N, Mem{T}} where {T, N}
+    FSA = FixedSizeArray{T, N, Mem{T}, Size} where {T, N, Size <: NTuple{N, Integer}}
     t_fsa = Union{
         Type{FSA},
         Type{FSA{T, N} where {T}} where {N},
+        Type{FSA{T, N, Size} where {T}} where {N, Size <: NTuple{N, Integer}},
+        Type{FSA{T, N, NTuple{N, Int}} where {T, N}},
     }
     @eval begin
         function parent_type_with_default(::$t_fsa)
@@ -91,13 +134,43 @@ function check_ndims(::Type{<:FixedSizeArray}, size::Tuple{Vararg{Integer}})
     size
 end
 
+function check_size_type(::Type{FSA}) where {
+    N,
+    Size <: NTuple{N, Integer},
+    FSA <: (FixedSizeArray{T, N, Mem, Size} where {T, Mem <: DenseVector{T}}),
+}
+    for t ∈ fieldtypes(Size)
+        if !Base.issingletontype(t) && !(t <: Int)
+            throw(ArgumentError("size tuple fields must be either of singleton type or `Int`"))
+        end
+    end
+    FSA
+end
+function check_size_type(::Type{FSA}) where {FSA <: FixedSizeArray}
+    FSA
+end
+
+function convert_array_size_tuple(
+    ::Type{<:(FixedSizeArray{T, N, Mem, Size} where {T, Mem <: DenseVector{T}})},
+    size::Tuple{Vararg{Integer}},
+) where {N, Size <: NTuple{N, Integer}}
+    convert(Size, size)
+end
+function convert_array_size_tuple(::Type{<:FixedSizeArray}, size::Tuple{Vararg{Integer}})
+    size
+end
+
 function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {T, FSA <: FixedSizeArray{T}}
-    size = check_ndims(FSA, size)
-    s = map(Int, size)
-    Mem = parent_type_with_default(FSA)
-    len = checked_dims(s)
+    fsa_type = check_constructor_is_allowed(FSA)
+    fsa_type = check_size_type(fsa_type)
+    size = check_ndims(fsa_type, size)
+    siz = convert_array_size_tuple(fsa_type, size)
+    siz_integer = normalized_dims(normalized_dim_integer, siz)
+    siz_int = normalized_dims(normalized_dim_int, siz_integer)
+    Mem = parent_type_with_default(fsa_type)
+    len = checked_dims(siz_int)
     mem = Mem(undef, len)
-    new_fixed_size_array(mem, s)
+    new_fixed_size_array(mem, siz_integer)
 end
 
 function (::Type{FSA})(::UndefInitializer, size::Tuple{Vararg{Integer}}) where {T, FSA <: FixedSizeArray{T}}
@@ -347,6 +420,6 @@ function Base.iterate(a::FixedSizeArray, state)
     iterate(a.mem, state)
 end
 
-const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_type{T}} where {T, N}
+const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_type{T}, NTuple{N, Int}} where {T, N}
 const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
 const FixedSizeMatrixDefault = FixedSizeArrayDefault{T, 2} where {T}
