@@ -91,7 +91,7 @@ function empty_fsv(::Type{V}, iterator) where {V <: DenseVector}
 end
 
 """
-    collect_as_fsv(V::Type{<:DenseVector}, iterator)
+    collect_as_fsv(V::Type{<:DenseVector}, iterator)::FixedSizeVector
 
 Collect the elements of `iterator` into a `FixedSizeVector`. The argument `V`
 specifies the underlying storage type parameter of this `FixedSizeVector`. When
