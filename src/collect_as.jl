@@ -77,9 +77,7 @@ function empty_fsv(::Type{V}, iterator) where {V <: DenseVector}
         if isconcretetype(E)
             fsv_type_from_underlying_storage_type(V{E})(undef, 0)
         else
-            let E = Union{}
-                fsv_type_from_underlying_storage_type(V{E})(undef, 0)
-            end
+            fsv_type_from_underlying_storage_type(V{Union{}})(undef, 0)
         end
     end
 end
