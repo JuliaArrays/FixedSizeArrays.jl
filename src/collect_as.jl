@@ -20,10 +20,6 @@ function fsv_type_from_underlying_storage_type(::Type{V}) where {E, V <: DenseVe
     FixedSizeVector{E, V}
 end
 
-function collect_as_return_type_helper(::Type{Storage}, ::Type{Vector{E}}) where {Storage <: AbstractVector, E}
-    fsv_type_from_underlying_storage_type(collect_as_storage_type_helper(Storage, E))
-end
-
 function make_vector_from_tuple(::Type{V}, elems::Tuple) where {V <: DenseVector}
     stor = collect_as_storage_type_helper(V, eltype(elems))
     ret_type = Vector{eltype(stor)}
@@ -104,7 +100,8 @@ function collect_as_fsv(::Type{V}, iterator) where {V <: DenseVector}
                     break
                 end
             end
-            ret_type = collect_as_return_type_helper(V, typeof(ret))
+            ret_type_storage = collect_as_storage_type_helper(V, eltype(ret))
+            ret_type = fsv_type_from_underlying_storage_type(ret_type_storage)
             ret_type(ret)
         end
     else
