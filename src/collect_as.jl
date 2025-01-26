@@ -55,6 +55,14 @@ function push(v::Vector, e)
     ret
 end
 
+"""
+    push!!(t::Type{<:AbstractVector}, v::Vector, e)::Vector
+
+Return a `Vector`, `r`, respecting these properties:
+* `all(r[begin:(end - 1)] .=== v)`
+* if `t` specifies an element type, `E`, `r[end] == E(e)`, otherwise `r[end] === e`
+"""
+function push!! end
 function push!!(::Type{<:AbstractVector{E}}, v::Vector{E}, e::E) where {E}
     push!(v, e)
 end
