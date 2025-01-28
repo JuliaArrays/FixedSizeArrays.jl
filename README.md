@@ -128,5 +128,5 @@ top:
 ### What about the other package with same name?
 
 FixedSizeArrays.jl is not related to a package with the same name by @SimonDanisch.
-That, earlier, package was one of the StaticArrays.jl-like package in the pre-v1
+That, earlier, package was one of the StaticArrays.jl-like packages in the pre-v1
 days of Julia: https://github.com/SimonDanisch/FixedSizeArrays.jl
