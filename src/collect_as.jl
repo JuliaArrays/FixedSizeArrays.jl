@@ -105,12 +105,11 @@ of the return value is:
 """
 function collect_as_fsv(::Type{V}, iterator) where {V <: DenseVector}
     es1 = iterate(iterator)  # unroll a bit to avoid unnecessary allocations and help inference
-    T2 = Tuple{Any, Any}
-    if es1 isa T2
+    if es1 isa Tuple
         let (e1, s1) = es1, state = s1, ret = make_vector_from_tuple(V, (e1,))
             while true
                 es = iterate(iterator, state)
-                if es isa T2
+                if es isa Tuple
                     let (e, s) = es
                         state = s
                         ret = push!!(V, ret, e)
