@@ -521,6 +521,7 @@ end
                 (i for i ∈ (false, 0x1, 2) if Bool(2 - 1)),
                 (i for i ∈ (false, 0x1, 2) if Bool(2 - 2)),
                 (i + false for i ∈ (false, 0x1, 2) if Bool(2 - 2)),
+                Iterators.filter(<(1), Int[]),
             )
             abstract_array_params(::AbstractArray{T,N}) where {T,N} = (T, N)
             @testset "iterator: $iterator" for iterator ∈ iterators
