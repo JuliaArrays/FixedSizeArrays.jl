@@ -11,7 +11,7 @@ function collect_as_storage_type_helper(::Type{Storage}, ::Type{E}) where {Stora
     Storage{E}
 end
 
-function make_abstract_vector_from_tuple(::Type{V}, elems::Tuple) where {E, V <: AbstractVector{E}}
+function make_abstract_vector_from_collection_with_length(::Type{V}, elems) where {E, V <: AbstractVector{E}}
     ret = V(undef, length(elems))
     copyto!(ret, elems)
 end
@@ -23,7 +23,7 @@ end
 function make_vector_from_tuple(::Type{V}, elems::Tuple) where {V <: DenseVector}
     stor = collect_as_storage_type_helper(V, eltype(elems))
     ret_type = Vector{eltype(stor)}
-    make_abstract_vector_from_tuple(ret_type, elems)
+    make_abstract_vector_from_collection_with_length(ret_type, elems)
 end
 
 function parent_type_with_default(::Type{<:(FixedSizeArray{E, N, T} where {N})}) where {E, T <: DenseVector{E}}
