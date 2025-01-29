@@ -4,6 +4,13 @@ function throw_bottom_type()
     throw(ArgumentError("`Union{}` not expected"))
 end
 
+function eltype_is_known(::Type{Storage}) where {S, Storage <: AbstractVector{S}}
+    true
+end
+function eltype_is_known(::Type{Storage}) where {Storage <: AbstractVector}
+    false
+end
+
 function collect_as_storage_type_helper(::Type{Storage}, ::Type) where {S, Storage <: AbstractVector{S}}
     Storage
 end
@@ -18,6 +25,12 @@ end
 
 function fsv_type_from_underlying_storage_type(::Type{V}) where {E, V <: DenseVector{E}}
     FixedSizeVector{E, V}
+end
+
+function make_fsv_from_collection_with_length(::Type{V}, elems) where {V <: DenseVector}
+    stor = collect_as_storage_type_helper(V, eltype(elems))
+    ret_type = fsv_type_from_underlying_storage_type(stor)
+    make_abstract_vector_from_collection_with_length(ret_type, elems)
 end
 
 function make_vector_from_tuple(::Type{V}, elems::Tuple) where {V <: DenseVector}
@@ -159,7 +172,14 @@ function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
     end
     mem = parent_type_with_default(T)
     output_dimension_count = checked_dimension_count_of(T, size_class)
-    fsv = collect_as_fsv(mem, iterator)
+    fsv = if (
+        (size_class isa Union{Base.HasLength, Base.HasShape}) &&
+        (eltype_is_known(mem) || isconcretetype(eltype(iterator)))
+    )
+        make_fsv_from_collection_with_length(mem, iterator)  # fast path
+    else
+        collect_as_fsv(mem, iterator)
+    end
     if isone(output_dimension_count)
         fsv  # `size(iterator)` may throw in this branch
     else
