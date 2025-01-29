@@ -519,6 +519,8 @@ end
                 (i for i ∈ 7:9 if i==8), 7:8, 8:7, map(BigInt, 7:8), Int[], [7], [7 8],
                 Iter((), 1, 7), Iter((3,), 3, 7), Iter((3, 2), 6, 7),
                 (i for i ∈ (false, 0x1, 2) if Bool(2 - 1)),
+                (i for i ∈ (false, 0x1, 2) if Bool(2 - 2)),
+                (i + false for i ∈ (false, 0x1, 2) if Bool(2 - 2)),
             )
             abstract_array_params(::AbstractArray{T,N}) where {T,N} = (T, N)
             @testset "iterator: $iterator" for iterator ∈ iterators
