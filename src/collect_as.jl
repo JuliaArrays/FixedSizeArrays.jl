@@ -5,7 +5,7 @@ function throw_bottom_type()
 end
 
 function eltype_is_known(::Type{Storage}) where {S, Storage <: AbstractVector{S}}
-    true
+    @isdefined S
 end
 function eltype_is_known(::Type{Storage}) where {Storage <: AbstractVector}
     false
