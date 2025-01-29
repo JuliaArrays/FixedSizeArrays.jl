@@ -484,6 +484,8 @@ end
             @testset "empty iterator with inexact `eltype`" begin
                 iterator = Iterators.map((x -> x + 0.3), [])
                 @test collect_as(FSV, iterator) isa FSV{Union{}}
+                @test collect_as(FSV{Union{}}, iterator) isa FSV{Union{}}
+                @test collect_as(FSV{Float32}, iterator) isa FSV{Float32}
             end
             @testset "`Union{}`" begin
                 @test_throws Exception collect_as(Union{}, ())
