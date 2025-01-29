@@ -486,6 +486,7 @@ end
                 @test collect_as(FSV, iterator) isa FSV{Union{}}
                 @test collect_as(FSV{Union{}}, iterator) isa FSV{Union{}}
                 @test collect_as(FSV{Float32}, iterator) isa FSV{Float32}
+                @test collect_as(FSV{Any}, iterator) isa FSV{Any}
             end
             @testset "`Union{}`" begin
                 @test_throws Exception collect_as(Union{}, ())
