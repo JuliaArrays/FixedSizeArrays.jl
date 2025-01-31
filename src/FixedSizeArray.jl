@@ -42,33 +42,28 @@ for T ∈ (Vector, optional_memory...)
     end
 end
 
-function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
-    new_fixed_size_array(V(undef, checked_dims(size))::V, size)
+function check_ndims(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {N, FSA <: (FixedSizeArray{E, N} where {E})}
+    if N != length(size)
+        throw(DimensionMismatch("mismatch between dimension count in type and the length of the size tuple"))
+    end
 end
-function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N,V}
-    ints = map(Int, size)::NTuple{N,Int}  # prevent infinite recursion
-    FixedSizeArray{T,N,V}(undef, ints)
+function check_ndims(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {FSA <: FixedSizeArray}
 end
-function FixedSizeArray{T,N,V}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N,V}
-    FixedSizeArray{T,N,V}(undef, size)
+
+function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {E, FSA <: FixedSizeArray{E}}
+    check_ndims(FSA, size)
+    s = map(Int, size)
+    Mem = parent_type_with_default(FSA)
+    len = checked_dims(s)
+    mem = Mem(undef, len)
+    new_fixed_size_array(mem, s)
 end
-function FixedSizeArray{T,<:Any,V}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N,V}
-    FixedSizeArray{T,N,V}(undef, size)
+
+function (::Type{FSA})(::UndefInitializer, size::Tuple{Vararg{Integer}}) where {E, FSA <: FixedSizeArray{E}}
+    undef_constructor(FSA, size)
 end
-function FixedSizeArray{T,<:Any,V}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N,V}
-    FixedSizeArray{T,N,V}(undef, size)
-end
-function FixedSizeArray{T,N}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N}
-    FixedSizeArray{T,N,default_underlying_storage_type{T}}(undef, size)
-end
-function FixedSizeArray{T,N}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N}
-    FixedSizeArray{T,N}(undef, size)
-end
-function FixedSizeArray{T}(::UndefInitializer, size::Vararg{Integer,N}) where {T,N}
-    FixedSizeArray{T,N}(undef, size)
-end
-function FixedSizeArray{T}(::UndefInitializer, size::NTuple{N,Integer}) where {T,N}
-    FixedSizeArray{T,N}(undef, size)
+function (::Type{FSA})(::UndefInitializer, size::Vararg{Integer}) where {E, FSA <: FixedSizeArray{E}}
+    undef_constructor(FSA, size)
 end
 
 macro assume_noub_if_noinbounds(x)
