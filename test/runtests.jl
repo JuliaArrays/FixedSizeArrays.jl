@@ -167,6 +167,12 @@ end
         end
 
         @testset "Constructors" begin
+            @testset "mismatched ndims" begin
+                @test_throws MethodError FSV{Int}(undef)
+                @test_throws MethodError FSV{Int}(undef, 1, 1)
+                @test_throws MethodError FSM{Int}(undef)
+                @test_throws MethodError FSM{Int}(undef, 1)
+            end
             for dim_count ∈ 0:4
                 siz = ntuple(Returns(2), dim_count)
                 T = FSA{Float64}
