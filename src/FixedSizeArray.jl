@@ -21,6 +21,27 @@ end
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
+function parent_type_with_default(::Type{<:(FixedSizeArray{E, N, T} where {N})}) where {E, T <: DenseVector{E}}
+    T
+end
+function parent_type_with_default(::Type{<:FixedSizeArray{E}}) where {E}
+    default_underlying_storage_type{E}
+end
+function parent_type_with_default(::Type{<:FixedSizeArray})
+    default_underlying_storage_type
+end
+for T ∈ (Vector, optional_memory...)
+    FSA = FixedSizeArray{E, N, T{E}} where {E, N}
+    @eval begin
+        function parent_type_with_default(::Type{$FSA})
+            $T
+        end
+        function parent_type_with_default(::Type{($FSA){E, N} where {E}}) where {N}
+            $T
+        end
+    end
+end
+
 function FixedSizeArray{T,N,V}(::UndefInitializer, size::NTuple{N,Int}) where {T,N,V}
     new_fixed_size_array(V(undef, checked_dims(size))::V, size)
 end
