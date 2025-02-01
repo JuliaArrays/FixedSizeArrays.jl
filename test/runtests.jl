@@ -150,6 +150,11 @@ end
         test_inferred(FixedSizeVector{Int}, return_type, arr)
     end
 
+    @testset "`undef` construction without element type" begin
+        @test_throws MethodError FixedSizeVector(undef, 1)
+        @test_throws MethodError FixedSizeMatrix(undef, 1, 1)
+    end
+
     for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
         FSV = fsv(storage_type)
         FSM = fsm(storage_type)
@@ -167,6 +172,10 @@ end
         end
 
         @testset "Constructors" begin
+            @testset "`undef` construction without element type" begin
+                @test_throws MethodError FSV(undef, 1)
+                @test_throws MethodError FSM(undef, 1, 1)
+            end
             @testset "mismatched ndims" begin
                 @test_throws MethodError FSV{Int}(undef)
                 @test_throws MethodError FSV{Int}(undef, 1, 1)
