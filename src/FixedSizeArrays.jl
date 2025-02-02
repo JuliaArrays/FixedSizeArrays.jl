@@ -1,5 +1,7 @@
 module FixedSizeArrays
 
+using CheckedSizeProduct
+
 const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
 
 const optional_memory = (@isdefined Memory) ? (Memory,) : ()
