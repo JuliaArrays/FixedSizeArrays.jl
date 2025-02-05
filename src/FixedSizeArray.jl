@@ -42,7 +42,7 @@ for T ∈ (Vector, optional_memory...)
     end
 end
 
-function check_ndims(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {N, FSA <: (FixedSizeArray{E, N} where {E})}
+function check_ndims(::Type{<:(FixedSizeArray{E, N} where {E})}, size::Tuple{Vararg{Integer}}) where {N}
     if size isa Tuple{Vararg{Any, N}}
         size
     else
