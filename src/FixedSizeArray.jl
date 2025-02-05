@@ -54,7 +54,7 @@ function check_ndims(::Type{<:FixedSizeArray}, size::Tuple{Vararg{Integer}})
 end
 
 function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {E, FSA <: FixedSizeArray{E}}
-    check_ndims(FSA, size)
+    size = check_ndims(FSA, size)
     s = map(Int, size)
     Mem = parent_type_with_default(FSA)
     len = checked_dims(s)
