@@ -39,27 +39,6 @@ function make_vector_from_tuple(::Type{V}, elems::Tuple) where {V <: DenseVector
     make_abstract_vector_from_collection_with_length(ret_type, elems)
 end
 
-function parent_type_with_default(::Type{<:(FixedSizeArray{E, N, T} where {N})}) where {E, T <: DenseVector{E}}
-    T
-end
-function parent_type_with_default(::Type{<:FixedSizeArray{E}}) where {E}
-    default_underlying_storage_type{E}
-end
-function parent_type_with_default(::Type{<:FixedSizeArray})
-    default_underlying_storage_type
-end
-for T ∈ (Vector, optional_memory...)
-    FSA = FixedSizeArray{E, N, T{E}} where {E, N}
-    @eval begin
-        function parent_type_with_default(::Type{$FSA})
-            $T
-        end
-        function parent_type_with_default(::Type{($FSA){E, N} where {E}}) where {N}
-            $T
-        end
-    end
-end
-
 function push(v::Vector, e)
     E = typejoin(typeof(e), eltype(v))
     ret = Vector{E}(undef, length(v) + 1)
