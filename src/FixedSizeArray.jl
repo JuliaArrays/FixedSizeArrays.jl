@@ -50,6 +50,7 @@ function check_ndims(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {N, FSA <:
     end
 end
 function check_ndims(::Type{<:FixedSizeArray}, size::Tuple{Vararg{Integer}})
+    size
 end
 
 function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {E, FSA <: FixedSizeArray{E}}
