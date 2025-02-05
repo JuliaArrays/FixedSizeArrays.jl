@@ -43,7 +43,9 @@ for T ∈ (Vector, optional_memory...)
 end
 
 function check_ndims(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {N, FSA <: (FixedSizeArray{E, N} where {E})}
-    if N != length(size)
+    if size isa Tuple{Vararg{Any, N}}
+        size
+    else
         throw(DimensionMismatch("mismatch between dimension count in type and the length of the size tuple"))
     end
 end
