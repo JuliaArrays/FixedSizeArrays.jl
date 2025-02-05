@@ -47,7 +47,7 @@ function check_ndims(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {N, FSA <:
         throw(DimensionMismatch("mismatch between dimension count in type and the length of the size tuple"))
     end
 end
-function check_ndims(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {FSA <: FixedSizeArray}
+function check_ndims(::Type{<:FixedSizeArray}, size::Tuple{Vararg{Integer}})
 end
 
 function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {E, FSA <: FixedSizeArray{E}}
