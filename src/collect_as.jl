@@ -144,11 +144,12 @@ end
 Tries to construct a value of type `t` from the iterator `iterator`. The type `t`
 must either be concrete, or a `UnionAll` without constraints.
 """
-function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
+function collect_as(::Type{FSA}, iterator) where {FSA<:FixedSizeArray}
     size_class = Base.IteratorSize(iterator)
     if size_class == Base.IsInfinite()
         throw(ArgumentError("iterator is infinite, can't fit infinitely many elements into a `FixedSizeArray`"))
     end
+    T = check_constructor_is_allowed(FSA)
     mem = parent_type_with_default(T)
     output_dimension_count = checked_dimension_count_of(T, size_class)
     fsv = if (
@@ -163,5 +164,5 @@ function collect_as(::Type{T}, iterator) where {T<:FixedSizeArray}
         fsv  # `size(iterator)` may throw in this branch
     else
         reshape(fsv, size(iterator))
-    end::T
+    end
 end

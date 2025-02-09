@@ -18,6 +18,43 @@ function Base.propertynames(
     ()
 end
 
+const FixedSizeArrayAllowedConstructorType = let
+    function f(Mem::UnionAll)
+        Union{
+            # 0 fixed parameters
+            Type{FixedSizeArray{T, N, Mem{T}} where {T, N}},
+            # 1 fixed parameter
+            Type{FixedSizeArray{T, N, Mem{T}} where {N}} where {T},
+            Type{FixedSizeArray{T, N, Mem{T}} where {T}} where {N},
+            # 2 fixed parameters
+            Type{FixedSizeArray{T, N, Mem{T}}} where {T, N},
+        }
+    end
+    special_storage_types = (Vector, optional_memory...)
+    Union{
+        # 0 fixed parameters
+        Type{FixedSizeArray},
+        # 1 fixed parameter
+        Type{FixedSizeArray{T}} where {T},
+        Type{FixedSizeArray{T, N} where {T}} where {N},
+        # 2 fixed parameters
+        Type{FixedSizeArray{T, N}} where {T, N},
+        Type{FixedSizeArray{T, N, Mem} where {N}} where {T, Mem <: DenseVector{T}},
+        # 3 fixed parameters
+        Type{FixedSizeArray{T, N, Mem}} where {T, N, Mem <: DenseVector{T}},
+        # special cases depending on the underlying storage type
+        map(f, special_storage_types)...,
+    }
+end
+
+function check_constructor_is_allowed(::Type{T}) where {T <: FixedSizeArray}
+    if Type{T} <: FixedSizeArrayAllowedConstructorType
+        T
+    else
+        throw(ArgumentError("technical limitation: type is not among the allowed `FixedSizeArray` constructors (try deleting type parameter constraints)"))
+    end
+end
+
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
