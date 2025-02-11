@@ -300,7 +300,7 @@ FixedSizeArray(a::AbstractArray{T,N})          where {T,N} = FixedSizeArray{T,N}
 # conversion
 
 Base.convert(::Type{T}, a::T) where {T<:FixedSizeArray} = a
-Base.convert(::Type{T}, a::AbstractArray) where {T<:FixedSizeArray} = T(a)::T
+Base.convert(::Type{T}, a::AbstractArray) where {T<:FixedSizeArray} = T(a)
 
 # `copyto!`
 
