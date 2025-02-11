@@ -491,7 +491,7 @@ end
                     collect_as(T, iter)
                     true
                 catch e
-                    (e isa TypeError) || rethrow()
+                    (e isa ArgumentError) || rethrow()
                     false
                 end
                 returns && @test collect_as(T, iter) isa T
