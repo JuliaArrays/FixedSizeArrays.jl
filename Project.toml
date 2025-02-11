@@ -3,5 +3,9 @@ uuid = "3821ddf9-e5b5-40d5-8e25-6813ab96b5e2"
 authors = ["Mosè Giordano <mose@gnu.org>"]
 version = "0.1.0"
 
+[deps]
+CheckedSizeProduct = "1b2cc9da-92e3-4b71-9788-30fc110eefda"
+
 [compat]
+CheckedSizeProduct = "1"
 julia = "1.10"
