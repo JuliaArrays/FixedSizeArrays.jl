@@ -5,8 +5,8 @@ export
 struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
     mem::Mem
     size::NTuple{N,Int}
-    global function new_fixed_size_array(mem::M, size::NTuple{N,Int}) where {T,N,M<:DenseVector{T}}
-        new{T,N,M}(mem, size)
+    global function new_fixed_size_array(mem::DenseVector{T}, size::NTuple{N,Int}) where {T,N}
+        new{T,N,typeof(mem)}(mem, size)
     end
 end
 
