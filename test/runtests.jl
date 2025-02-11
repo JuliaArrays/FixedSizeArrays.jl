@@ -136,6 +136,7 @@ end
         default = FixedSizeArrays.default_underlying_storage_type
         @test default === (@isdefined(Memory) ? Memory : Vector)
         return_type = FixedSizeVector{Int,default{Int}}
+        @test return_type === FixedSizeVectorDefault{Int}
         test_inferred(FixedSizeArray{Int}, return_type, (undef, 3))
         test_inferred(FixedSizeArray{Int}, return_type, (undef, (3,)))
         test_inferred(FixedSizeVector{Int}, return_type, (undef, 3))
