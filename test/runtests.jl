@@ -95,6 +95,7 @@ end
                 @test isconcretetype(t)
             end
         end
+        @test FixedSizeArrays.FixedSizeArrayAllowedConstructorType <: Type{<:FixedSizeArray}
     end
 
     @testset "safe computation of length from dimensions size" begin
