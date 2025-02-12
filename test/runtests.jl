@@ -107,6 +107,11 @@ end
                     a = FixedSizeArray{elt}(args...)
                     @test siz === @inferred size(a)
                 end
+                let a = requested_type(undef, 3 * 7)
+                    for args ∈ ((a, siz), (a, siz...))
+                        test_inferred(reshape, return_type, args)
+                    end
+                end
             end
             let a = FixedSizeArray{Float32}(undef, (big(3), big(7)))
                 @test (3, 7) === @inferred size(a)

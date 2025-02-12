@@ -403,12 +403,20 @@ Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
 
 # `reshape`: specializing it to ensure it returns a `FixedSizeArray`
 
-function Base.reshape(a::FixedSizeArray, size::(NTuple{N,Int} where {N}))
-    len = checked_dims(size)
+function reshape_fsa(a::FixedSizeArray, size::Tuple{Vararg{Integer}})
+    size_int = normalized_dims(normalized_dim_int, size)
+    len = checked_dims(size_int)
     if length(a) != len
         throw(DimensionMismatch("new shape not consistent with existing array length"))
     end
     new_fixed_size_array(a.mem, size)
+end
+
+function Base.reshape(a::FixedSizeArray, size::Tuple{Vararg{Int}})
+    reshape_fsa(a, size)
+end
+function Base.reshape(a::FixedSizeArray, size::Tuple{Integer, Vararg{Integer}})
+    reshape_fsa(a, size)
 end
 
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods
