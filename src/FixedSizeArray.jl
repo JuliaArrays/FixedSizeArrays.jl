@@ -58,29 +58,29 @@ end
 const FixedSizeVector{T} = FixedSizeArray{T,1}
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-function parent_type_with_default(::Type{<:(FixedSizeArray{E, N, T} where {N})}) where {E, T <: DenseVector{E}}
-    T
+function parent_type_with_default(::Type{<:(FixedSizeArray{T, N, Mem} where {N})}) where {T, Mem <: DenseVector{T}}
+    Mem
 end
-function parent_type_with_default(::Type{<:FixedSizeArray{E}}) where {E}
-    default_underlying_storage_type{E}
+function parent_type_with_default(::Type{<:FixedSizeArray{T}}) where {T}
+    default_underlying_storage_type{T}
 end
 function parent_type_with_default(::Type{<:FixedSizeArray})
     default_underlying_storage_type
 end
-for T ∈ (Vector, optional_memory...)
-    FSA = FixedSizeArray{E, N, T{E}} where {E, N}
+for Mem ∈ (Vector, optional_memory...)
+    FSA = FixedSizeArray{T, N, Mem{T}} where {T, N}
     t_fsa = Union{
         Type{FSA},
-        Type{FSA{E, N} where {E}} where {N},
+        Type{FSA{T, N} where {T}} where {N},
     }
     @eval begin
         function parent_type_with_default(::$t_fsa)
-            $T
+            $Mem
         end
     end
 end
 
-function check_ndims(::Type{<:(FixedSizeArray{E, N} where {E})}, size::Tuple{Vararg{Integer}}) where {N}
+function check_ndims(::Type{<:(FixedSizeArray{T, N} where {T})}, size::Tuple{Vararg{Integer}}) where {N}
     if size isa Tuple{Vararg{Any, N}}
         size
     else
@@ -91,7 +91,7 @@ function check_ndims(::Type{<:FixedSizeArray}, size::Tuple{Vararg{Integer}})
     size
 end
 
-function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {E, FSA <: FixedSizeArray{E}}
+function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {T, FSA <: FixedSizeArray{T}}
     size = check_ndims(FSA, size)
     s = map(Int, size)
     Mem = parent_type_with_default(FSA)
@@ -100,10 +100,10 @@ function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {E, 
     new_fixed_size_array(mem, s)
 end
 
-function (::Type{FSA})(::UndefInitializer, size::Tuple{Vararg{Integer}}) where {E, FSA <: FixedSizeArray{E}}
+function (::Type{FSA})(::UndefInitializer, size::Tuple{Vararg{Integer}}) where {T, FSA <: FixedSizeArray{T}}
     undef_constructor(FSA, size)
 end
-function (::Type{FSA})(::UndefInitializer, size::Vararg{Integer}) where {E, FSA <: FixedSizeArray{E}}
+function (::Type{FSA})(::UndefInitializer, size::Vararg{Integer}) where {T, FSA <: FixedSizeArray{T}}
     undef_constructor(FSA, size)
 end
 
@@ -192,9 +192,9 @@ end
 
 function Base.similar(
     bc::Broadcast.Broadcasted{FixedSizeArrayBroadcastStyle{N, Mem}},
-    ::Type{E},
-) where {N,Mem,E}
-    similar(FixedSizeArray{E, N, Mem{E}}, axes(bc))
+    ::Type{T},
+) where {N,Mem,T}
+    similar(FixedSizeArray{T, N, Mem{T}}, axes(bc))
 end
 
 # helper functions
@@ -269,7 +269,7 @@ function check_count_value(n)
     n
 end
 
-parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,T}}) where {T} = T
+parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,Mem}}) where {Mem} = Mem
 
 underlying_storage(m) = m
 underlying_storage(f::FixedSizeArray) = f.mem
