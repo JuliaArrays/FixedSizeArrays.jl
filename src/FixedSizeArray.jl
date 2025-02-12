@@ -277,25 +277,13 @@ axes_are_one_based(axes) = all(isone ∘ first, axes)
 
 # converting constructors for copying other array types
 
-function FixedSizeArray{T,N,V}(src::AbstractArray{S,N}) where {T,N,V,S}
+function (::Type{FSA})(src::AbstractArray) where {FSA <: FixedSizeArray}
     axs = axes(src)
     if !axes_are_one_based(axs)
         throw(DimensionMismatch("source array has a non-one-based indexing axis"))
     end
-    # Can't use `Base.size` because, according to it's doc string, it's not
-    # available for all `AbstractArray` types.
-    size = map(length, axs)
-    dst = FixedSizeArray{T,N,V}(undef, size)
-    copyto!(dst.mem, src)
-    dst
+    collect_as(FSA, src)
 end
-
-FixedSizeArray{T,<:Any,V}(a::AbstractArray{<:Any,N}) where {V,T,N} = FixedSizeArray{T,N,V}(a)
-
-FixedSizeArray{T,N}(a::AbstractArray{<:Any,N}) where {T,N} = FixedSizeArray{T,N,default_underlying_storage_type{T}}(a)
-FixedSizeArray{T}(a::AbstractArray{<:Any,N})   where {T,N} = FixedSizeArray{T,N}(a)
-FixedSizeArray{<:Any,N}(a::AbstractArray{T,N}) where {T,N} = FixedSizeArray{T,N}(a)
-FixedSizeArray(a::AbstractArray{T,N})          where {T,N} = FixedSizeArray{T,N}(a)
 
 # conversion
 
