@@ -69,11 +69,12 @@ function parent_type_with_default(::Type{<:FixedSizeArray})
 end
 for T ∈ (Vector, optional_memory...)
     FSA = FixedSizeArray{E, N, T{E}} where {E, N}
+    t_fsa = Union{
+        Type{FSA},
+        Type{FSA{E, N} where {E}} where {N},
+    }
     @eval begin
-        function parent_type_with_default(::Type{$FSA})
-            $T
-        end
-        function parent_type_with_default(::Type{($FSA){E, N} where {E}}) where {N}
+        function parent_type_with_default(::$t_fsa)
             $T
         end
     end
