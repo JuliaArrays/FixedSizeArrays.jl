@@ -119,6 +119,17 @@ end
             let a = FixedSizeArray{Float32}(undef, (big(3), Seven()))
                 @test (3, Seven()) === @inferred size(a)
             end
+            for WrongInt ∈ (UInt, BigInt, Bool)
+                for m ∈ (1, UInt(1), big(1), true)
+                    let elt = Float32
+                        requested_type = FixedSizeVector{elt, Mem{elt}, Tuple{WrongInt}}
+                        @test_throws ArgumentError requested_type(undef, m)
+                        @test_throws ArgumentError requested_type(undef, (m,))
+                        @test_throws ArgumentError requested_type([7])
+                        @test_throws ArgumentError collect_as(requested_type, [7])
+                    end
+                end
+            end
         end
     end
 

@@ -150,6 +150,7 @@ function collect_as(::Type{FSA}, iterator) where {FSA<:FixedSizeArray}
         throw(ArgumentError("iterator is infinite, can't fit infinitely many elements into a `FixedSizeArray`"))
     end
     T = check_constructor_is_allowed(FSA)
+    T = check_size_type(T)
     mem = parent_type_with_default(T)
     output_dimension_count = checked_dimension_count_of(T, size_class)
     fsv = if (
