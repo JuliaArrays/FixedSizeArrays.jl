@@ -1,6 +1,7 @@
 using Test
 using FixedSizeArrays
 using OffsetArrays: OffsetArray
+using Random: Random
 import Aqua
 
 # Check if the compilation options allow maximum performance.
@@ -570,6 +571,27 @@ end
                     @test a == fsa
                     @test first(abstract_array_params(fsa)) <: E
                 end
+            end
+        end
+    end
+
+    @static if isdefined(Base, :Memory)
+        # Tests in this set make sense only when Memory is defined, because rely
+        # on methods defined only for `Memory`.
+        @testset "Random" begin
+            for T in (Float16, Float32, Float64),
+                N in (4, 16, 64, 128, 256),
+                seed in (17, 42, 123, 5745192337902587512)
+
+                v = Memory{T}(undef, N)
+                fv = FixedSizeVectorDefault{T}(undef, N)
+                Random.seed!(seed)
+                Random.rand!(v)
+                Random.seed!(seed)
+                Random.rand!(fv)
+                # Make sure rand!(::FixedSizeArrays) generates same stream of
+                # numbers as rand!(::Memory)
+                @test v == fv
             end
         end
     end
