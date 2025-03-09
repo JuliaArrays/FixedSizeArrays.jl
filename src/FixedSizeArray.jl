@@ -146,32 +146,17 @@ Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(a.mem, i)
 
 # safe product of a tuple of integers, for calculating dimensions size
 
-checked_dims_impl(a::Int, ::Tuple{}, have_overflow::Bool) = (a, have_overflow)
-function checked_dims_impl(a::Int, t::Tuple{Int,Vararg{Int,N}}, have_overflow::Bool) where {N}
-    b = first(t)
-    (m, o) = Base.Checked.mul_with_overflow(a, b)
-    r = Base.tail(t)::NTuple{N,Int}
-    checked_dims_impl(m, r, have_overflow | o)::Tuple{Int,Bool}
-end
-
 checked_dims(::Tuple{}) = 1
 function checked_dims(t::Tuple{Int,Vararg{Int,N}}) where {N}
-    any_is_zero     = any(iszero,                 t)::Bool
-    any_is_negative = any((x -> x < false),       t)::Bool
-    any_is_typemax  = any((x -> x == typemax(x)), t)::Bool
-    a = first(t)
-    r = Base.tail(t)::NTuple{N,Int}
-    (product, have_overflow) = checked_dims_impl(a, r, false)::Tuple{Int,Bool}
-    if any_is_negative
-        throw(ArgumentError("array dimension size can't be negative"))
-    end
-    if any_is_typemax
-        throw(ArgumentError("array dimension size can't be the maximum representable value"))
-    end
-    if have_overflow & !any_is_zero
+    product = checked_size_product(t)
+    if product isa Int
+        product
+    else
+        if product isa CheckedSizeProduct.StatusInvalidValue
+            throw(ArgumentError("invalid array dimension size, can't be negative or the maximum representable value"))
+        end
         throw(ArgumentError("array dimensions too great, can't represent length"))
     end
-    product
 end
 
 # broadcasting
