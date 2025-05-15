@@ -1,6 +1,7 @@
 using Test
 using FixedSizeArrays
 using OffsetArrays: OffsetArray
+using Random: Random
 import Aqua
 
 # Check if the compilation options allow maximum performance.
@@ -571,6 +572,24 @@ end
                     @test first(abstract_array_params(fsa)) <: E
                 end
             end
+        end
+    end
+
+    @testset "Random" begin
+        for T in (Float16, Float32, Float64),
+            N in (4, 16, 64, 128, 256),
+            seed in (17, 42, 123, 5745192337902587512),
+            rng in (Random.default_rng(), Random.MersenneTwister())
+
+            v = FixedSizeArrays.default_underlying_storage_type{T}(undef, N)
+            fv = FixedSizeVectorDefault{T}(undef, N)
+            rng1 = Random.seed!(rng, seed)
+            Random.rand!(rng1, v)
+            rng2 = Random.seed!(rng, seed)
+            Random.rand!(rng2, fv)
+            # Make sure rand!(::FixedSizeArrays) generates same stream of
+            # numbers as rand!(::Memory)
+            @test v == fv
         end
     end
 end
