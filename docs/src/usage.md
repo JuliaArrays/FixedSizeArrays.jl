@@ -1,10 +1,4 @@
-## `FixedSizeArrays.jl`
-
-[![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
-[![Build Status](https://github.com/JuliaArrays/FixedSizeArrays.jl/actions/workflows/UnitTests.yml/badge.svg?branch=main)](https://github.com/JuliaArrays/FixedSizeArrays.jl/actions/workflows/UnitTests.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/JuliaArrays/FixedSizeArrays.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaArrays/FixedSizeArrays.jl)
-[![PkgEval](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/F/FixedSizeArrays.svg)](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/F/FixedSizeArrays.html)
-
+# Usage
 
 ```julia-repl
 julia> arr = [10 20; 30 14]
