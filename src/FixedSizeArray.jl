@@ -2,6 +2,21 @@ export
     FixedSizeArray, FixedSizeVector, FixedSizeMatrix,
     FixedSizeArrayDefault, FixedSizeVectorDefault, FixedSizeMatrixDefault
 
+"""
+    FixedSizeArray{T,N,Mem<:DenseVector{T}}(undef, size::NTuple{N,Int})
+    FixedSizeArray{T,N,Mem<:DenseVector{T}}(undef, size1::Int, size2::Int, ...)
+    FixedSizeArray{T,N,Mem<:DenseVector{T}}(array::AbstractArray)
+
+Construct a fixed-size `FixedSizeArray` with element type `T`, number of dimensions `N`, and memory backend `Mem`.
+
+Convenient aliases provided:
+
+* [`FixedSizeVector{T,Mem}`](@ref): for 1-dimensional fixed-size arrays
+* [`FixedSizeMatrix{T,Mem}`](@ref): for 2-dimensional fixed-size arrays
+* [`FixedSizeArrayDefault{T,N}`](@ref): for `N`-dimensional fixed-size arrays, with default memory backend
+* [`FixedSizeVectorDefault{T}`](@ref): for 1-dimensional fixed-size arrays, with default memory backend
+* [`FixedSizeMatrixDefault{T}`](@ref): for 2-dimensional fixed-size arrays, with default memory backend
+"""
 struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
     mem::Mem
     size::NTuple{N,Int}
@@ -55,7 +70,29 @@ function check_constructor_is_allowed(::Type{T}) where {T <: FixedSizeArray}
     end
 end
 
+"""
+    FixedSizeVector{T,Mem<:DenseVector{T}}(undef, size::NTuple{1,Int})
+    FixedSizeVector{T,Mem<:DenseVector{T}}(undef, size1::Int)
+    FixedSizeVector{T,Mem<:DenseVector{T}}(array::AbstractVector)
+
+Construct a fixed-size 1-dimensional [`FixedSizeArray`](@ref) with element type `T`, and memory backend `Mem`.
+
+Convenient aliases provided:
+
+* [`FixedSizeVectorDefault{T}`](@ref): for 1-dimensional fixed-size arrays, with default memory backend
+"""
 const FixedSizeVector{T} = FixedSizeArray{T,1}
+"""
+    FixedSizeMatrix{T,Mem<:DenseMatrix{T}}(undef, size::NTuple{2,Int})
+    FixedSizeMatrix{T,Mem<:DenseMatrix{T}}(undef, size1::Int, size2::Int)
+    FixedSizeMatrix{T,Mem<:DenseMatrix{T}}(array::AbstractMatrix)
+
+Construct a fixed-size 2-dimensional [`FixedSizeArray`](@ref) with element type `T`, and memory backend `Mem`.
+
+Convenient aliases provided:
+
+* [`FixedSizeMatrixDefault{T}`](@ref): for 2-dimensional fixed-size arrays, with default memory backend
+"""
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
 function parent_type_with_default(::Type{<:(FixedSizeArray{T, N, Mem} where {N})}) where {T, Mem <: DenseVector{T}}
@@ -347,6 +384,27 @@ function Base.iterate(a::FixedSizeArray, state)
     iterate(a.mem, state)
 end
 
+"""
+    FixedSizeArrayDefault{T,N}(undef, size::NTuple{N,Int})
+    FixedSizeArrayDefault{T,N}(undef, size1::Int, size2::Int, ...)
+    FixedSizeArrayDefault{T,N}(array::AbstractArray)
+
+Construct a [`FixedSizeArray`](@ref) with element type `T`, number of dimensions `N`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
+"""
 const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_type{T}} where {T, N}
+"""
+    FixedSizeVectorDefault{T}(undef, size::NTuple{1,Int})
+    FixedSizeVectorDefault{T}(undef, size1::Int)
+    FixedSizeVectorDefault{T}(array::AbstractVector)
+
+Construct a [`FixedSizeVector`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
+"""
 const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
+"""
+    FixedSizeMatrixDefault{T}(undef, size::NTuple{2,Int})
+    FixedSizeMatrixDefault{T}(undef, size1::Int, size2::Int)
+    FixedSizeMatrixDefault{T}(array::AbstractMatrix)
+
+Construct a [`FixedSizeMatrix`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
+"""
 const FixedSizeMatrixDefault = FixedSizeArrayDefault{T, 2} where {T}

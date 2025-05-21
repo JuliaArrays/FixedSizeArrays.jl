@@ -1,0 +1,9 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+FixedSizeArrays = "3821ddf9-e5b5-40d5-8e25-6813ab96b5e2"
+
+[compat]
+Documenter = "1"
+
+[sources]
+FixedSizeArrays = {path = ".."}
