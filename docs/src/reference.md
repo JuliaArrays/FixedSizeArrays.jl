@@ -1,24 +1,32 @@
+# Reference
+
 ## Index
 ```@index
 ```
 
-## Types
+## Public API
 
-```@autodocs
-Modules = [FixedSizeArrays]
-Order = [:type]
+```@docs
+FixedSizeArrays.FixedSizeArray
+FixedSizeVector
+FixedSizeMatrix
+FixedSizeArrayDefault
+FixedSizeVectorDefault
+FixedSizeMatrixDefault
+FixedSizeArrays.collect_as
 ```
 
-## Functions
+## Internal API
 
-```@autodocs
-Modules = [FixedSizeArrays]
-Order = [:function]
-```
+This section gathers documentation of internal functionalities of `FixedSizeArrays.jl` which are only of interest to the developers of and contributors to this package.
 
-## Constants
+!!! warning
 
-```@autodocs
-Modules = [FixedSizeArrays]
-Order = [:constant]
+    The following functionalities are **_not_** part of the public API of the package and should not be relied upon by external packages, as they can be modified or removed at any point without notice.
+
+```@docs
+FixedSizeArrays.with_stripped_type_parameters
+FixedSizeArrays.with_stripped_type_parameters_unchecked
+FixedSizeArrays.collect_as_fsv
+FixedSizeArrays.push!!
 ```
