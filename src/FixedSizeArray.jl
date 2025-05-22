@@ -1,4 +1,5 @@
 export
+    BoundsErrorLight,
     FixedSizeArray, FixedSizeVector, FixedSizeMatrix,
     FixedSizeArrayDefault, FixedSizeVectorDefault, FixedSizeMatrixDefault
 
@@ -164,9 +165,12 @@ macro assume_noub_if_noinbounds(x)
 end
 
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
-Base.@propagate_inbounds Base.getindex(A::FixedSizeArray, i::Int) = A.mem[i]
+Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray, i::Int)
+    @boundscheck check_bounds_light(A, i)
+    @inbounds A.mem[i]
+end
 Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray, x, i::Int)
-    @boundscheck checkbounds(A, i)
+    @boundscheck check_bounds_light(A, i)
     @inbounds A.mem[i] = x
     return A
 end
