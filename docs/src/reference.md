@@ -14,6 +14,7 @@ FixedSizeArrayDefault
 FixedSizeVectorDefault
 FixedSizeMatrixDefault
 FixedSizeArrays.collect_as
+BoundsErrorLight
 ```
 
 ## Internal API
