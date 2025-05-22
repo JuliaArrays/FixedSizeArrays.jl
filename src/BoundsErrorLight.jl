@@ -46,13 +46,15 @@ function Base.showerror(io::IO, ex::BoundsErrorLight)
     nothing
 end
 
+# inline everything to help escape analysis
+
 function throw_boundserrorlight(A::AbstractArray, i::Int)
-    @noinline
-    throw(BoundsErrorLight(typeof(A), size(A), i))
+    @inline
+    @inline throw(BoundsErrorLight(typeof(A), size(A), i))
 end
 
 function check_bounds_light(A::AbstractArray, i::Int)
     @inline
-    checkbounds(Bool, A, i) || @noinline throw_boundserrorlight(A, i)
+    @inline checkbounds(Bool, A, i) || @inline throw_boundserrorlight(A, i)
     nothing
 end
