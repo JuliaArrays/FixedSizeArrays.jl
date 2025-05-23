@@ -50,11 +50,11 @@ end
 
 function throw_boundserrorlight(A::AbstractArray, i::Int)
     @inline
-    @inline throw(BoundsErrorLight(typeof(A), size(A), i))
+    throw(BoundsErrorLight(typeof(A), size(A), i))
 end
 
 function check_bounds_light(A::AbstractArray, i::Int)
     @inline
-    @inline checkbounds(Bool, A, i) || @inline throw_boundserrorlight(A, i)
+    checkbounds(Bool, A, i) || throw_boundserrorlight(A, i)
     nothing
 end
