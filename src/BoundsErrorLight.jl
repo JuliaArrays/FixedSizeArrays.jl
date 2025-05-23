@@ -11,18 +11,6 @@ struct BoundsErrorLight <: Exception
     index::Int
 end
 
-function show_index(io::IO, x)
-    if x isa Colon
-        print(io, ':')
-    elseif x isa Base.OneTo
-        print(io, "1:")
-        show(io, last(x))
-    else
-        show(io, x)
-    end
-    nothing
-end
-
 function Base.showerror(io::IO, ex::BoundsErrorLight)
     typ = ex.type_of_array
     shp = ex.shape
@@ -32,16 +20,7 @@ function Base.showerror(io::IO, ex::BoundsErrorLight)
     print(io, " and shape ")
     show(io, shp)
     print(io, " at index [")
-    if (ind isa AbstractRange) || (ind isa AbstractString)
-        show(io, ind)
-    else
-        for (i, x) ∈ enumerate(ind)
-            if 1 < i
-                print(io, ", ")
-            end
-            show_index(io, x)
-        end
-    end
+    show(io, ind)
     print(io, ']')
     nothing
 end
