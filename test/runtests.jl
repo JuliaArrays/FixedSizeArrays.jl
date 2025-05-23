@@ -250,7 +250,18 @@ end
             v[2] = 2
             @test v[1] == 1
             @test v[2] == 2
-            @test_throws BoundsError v[3] = 3
+        end
+
+        @testset "out-of-bounds access" begin
+            v0 = FSV([])
+            v1 = FSV([3])
+            @test_throws BoundsErrorLight v0[1]
+            @test_throws BoundsErrorLight v1[2]
+            @test_throws BoundsErrorLight v0[1] = 7
+            @test_throws BoundsErrorLight v1[2] = 7
+            exc_text = sprint(showerror, BoundsErrorLight(typeof(v1), size(v1), 2))
+            @test startswith(exc_text, "BoundsErrorLight: ")
+            @test endswith(exc_text, "[2]")
         end
 
         @testset "FixedSizeVector" begin
