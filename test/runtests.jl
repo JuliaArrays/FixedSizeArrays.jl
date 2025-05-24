@@ -276,20 +276,6 @@ end
             test_inferred(similar, FSV{Int}, (FSV{Int}, (2,)))
             test_inferred(similar, FSV{Int}, (FSA{Int}, (2,)))
             example_abstract_vectors = (7:9, [7, 8, 9], OffsetArray([7, 8, 9], 1:3))
-            test_convert = function(T, a)
-                test_inferred(convert, FSV{Int}, (T, a))
-                c = convert(T, a)
-                test_inferred(convert, FSV{Int}, (T, c))
-                @test c == a
-                @test c === convert(T, c)
-            end
-            for T ∈ (FSA{Int}, FSV{Int})
-                for S ∈ (Int, Float64)
-                    for a ∈ map((c -> map(S, c)), example_abstract_vectors)
-                        test_convert(T, a)
-                    end
-                end
-            end
         end
 
         @testset "FixedSizeMatrix" begin
@@ -308,20 +294,6 @@ end
                 reshape(1:9, (3, 3)),
                 OffsetArray(reshape(1:9, (3, 3)), 1:3, 1:3),
             )
-            test_convert = function(T, a)
-                test_inferred(convert, FSM{Int}, (T, a))
-                c = convert(T, a)
-                test_inferred(convert, FSM{Int}, (T, c))
-                @test c == a
-                @test c === convert(T, c)
-            end
-            for T ∈ (FSA{Int}, FSM{Int})
-                for S ∈ (Int, Float64)
-                    for a ∈ map((c -> map(S, c)), example_abstract_matrices)
-                        test_convert(T, a)
-                    end
-                end
-            end
         end
 
         @testset "`map`" begin

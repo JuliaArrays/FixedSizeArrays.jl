@@ -327,11 +327,6 @@ function (::Type{FSA})(src::AbstractArray) where {FSA <: FixedSizeArray}
     collect_as(FSA, src)
 end
 
-# conversion
-
-Base.convert(::Type{T}, a::T) where {T<:FixedSizeArray} = a
-Base.convert(::Type{T}, a::AbstractArray) where {T<:FixedSizeArray} = T(a)
-
 # `copyto!`
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)
