@@ -1,5 +1,6 @@
 using Test
 using FixedSizeArrays
+using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
 import Aqua
@@ -242,6 +243,17 @@ end
                     end
                 end
             end
+        end
+
+        @testset "constructors taking `AbstractArray`" begin
+            @test [1, 2, 3] == (@inferred FSV([1, 2, 3]))::FSV{Int}
+            @test [1, 2, 3] == (@inferred FSA([1, 2, 3]))::FSV{Int}
+            @test [1, 2, 3] == (@inferred FSV(Any[1, 2, 3]))::FSV{Any}
+            @test [1, 2, 3] == (@inferred FSA(Any[1, 2, 3]))::FSV{Any}
+            @test [1, 2, 3] == (@inferred FSV(Real[1, 2, 3]))::FSV{Real}
+            @test [1, 2, 3] == (@inferred FSA(Real[1, 2, 3]))::FSV{Real}
+            @test [1, 2, 3] == (@inferred FSV{Float32}([1, 2, 3]))::FSV{Float32}
+            @test [1, 2, 3] == (@inferred FSA{Float32}([1, 2, 3]))::FSV{Float32}
         end
 
         @testset "setindex!" begin
@@ -516,10 +528,15 @@ end
             end
             @testset "empty iterator with inexact `eltype`" begin
                 iterator = Iterators.map((x -> x + 0.3), [])
-                @test collect_as(FSV, iterator) isa FSV{Union{}}
+                @test collect_as(FSV, iterator; empty_iterator_handler = Returns(Union{})) isa FSV{Union{}}
                 @test collect_as(FSV{Union{}}, iterator) isa FSV{Union{}}
                 @test collect_as(FSV{Float32}, iterator) isa FSV{Float32}
                 @test collect_as(FSV{Any}, iterator) isa FSV{Any}
+                @test_throws ArgumentError collect_as(FSV, iterator)
+            end
+            @testset "explicit handling of empty iterators" begin
+                @test [] == collect_as(FSV, []; empty_iterator_handler = Returns(Union{}))::FixedSizeArray{Union{}}
+                @test [] == collect_as(FSV, []; empty_iterator_handler = Returns(Bool))::FixedSizeArray{Bool}
             end
             @testset "`Union{}`" begin
                 @test_throws Exception collect_as(Union{}, ())
@@ -531,11 +548,11 @@ end
                     @test_throws ArgumentError collect_as(T, iterator)
                 end
             end
-            @test_throws ArgumentError collect_as(FSA{Int, -1}, 7:8)
+            @test_throws DimensionMismatch collect_as(FSA{Int, -1}, 7:8)
             @test_throws TypeError collect_as(FSA{Int, 3.1}, 7:8)
             for T ∈ (FSA{3}, FSV{3})
                 iterator = (7:8, (7, 8))
-                @test_throws TypeError collect_as(T, iterator)
+                @test_throws MethodError collect_as(T, iterator)
             end
             @testset "buggy iterator with mismatched `size` and `length" begin
                 for iterator ∈ (Iter((), 0, 7), Iter((3, 2), 5, 7))
@@ -561,6 +578,7 @@ end
                 (E, dim_count) = abstract_array_params(a)
                 af = collect(Float64, iterator)
                 @test abstract_array_params(af) == (Float64, dim_count)  # meta
+                iszero(dim_count) ||
                 @test_throws DimensionMismatch collect_as(FSA{E,dim_count+1}, iterator)
                 for T ∈ (FSA{E}, FSA{E,dim_count})
                     test_inferred(collect_as, FSA{E,dim_count}, (T, iterator))
@@ -568,6 +586,8 @@ end
                     @test a == fsa
                     @test first(abstract_array_params(fsa)) <: E
                 end
+                # `collect_as` throws by default when given an empty iterator with imprecise `eltype`
+                (isconcretetype(eltype(iterator)) || (eltype(iterator) <: Union{}) || !isempty(iterator)) &&
                 for T ∈ (FSA, FSA{<:Any,dim_count})
                     @test collect_as(T, iterator) isa FSA{E,dim_count}
                     fsa = collect_as(T, iterator)
@@ -580,6 +600,8 @@ end
                     @test af == fsa
                     @test first(abstract_array_params(fsa)) <: Float64
                 end
+                # `collect_as` throws by default when given an empty iterator with imprecise `eltype`
+                (isconcretetype(eltype(iterator)) || (eltype(iterator) <: Union{}) || !isempty(iterator)) &&
                 for T ∈ (FixedSizeArray{<:Any,dim_count},)
                     @test collect_as(T, iterator) isa FixedSizeArray{E,dim_count}
                     fsa = collect_as(T, iterator)

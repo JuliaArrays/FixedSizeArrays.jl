@@ -64,31 +64,31 @@ To make it easier to refer to the concrete type `FixedSizeArray{T,N,Mem}` with t
 ## The `collect_as` utility
 
 The [array literals syntax](https://docs.julialang.org/en/v1/manual/arrays/#man-array-literals) `[A, B, C, ...]` to construct arrays is limited to `Base`'s `Array` and cannot be extended to custom array types.
-`FixedSizeArrays.jl` provides a convenient function [`collect_as`](@ref) to overcome this limitation and construct `FixedSizeArray`s out of any iterable:
+The package [Collects.jl](https://github.com/JuliaCollections/Collects.jl) provides a convenient function, `collect_as`, to overcome this limitation and construct `FixedSizeArray`s out of any iterable:
 
 ```jldoctest
 julia> iter = (i for i ∈ 7:9 if i≠8);
 
-julia> using FixedSizeArrays
+julia> using FixedSizeArrays, Collects
 
-julia> const ca = FixedSizeArrays.collect_as;
-
-julia> ca(FixedSizeArray, iter)  # construct from an arbitrary iterator
+julia> collect_as(FixedSizeArray, iter)  # construct from an arbitrary iterator
 2-element FixedSizeArray{Int64, 1, Memory{Int64}}:
  7
  9
 
-julia> ca(FixedSizeArray{Float64}, iter)  # construct from an arbitrary iterator while converting element type
+julia> collect_as(FixedSizeArray{Float64}, iter)  # construct from an arbitrary iterator while converting element type
 2-element FixedSizeArray{Float64, 1, Memory{Float64}}:
  7.0
  9.0
 
-julia> ca(FixedSizeVectorDefault, (3.14, -4.2, 2.68))  # construct from a tuple
+julia> collect_as(FixedSizeVectorDefault, (3.14, -4.2, 2.68))  # construct from a tuple
 3-element FixedSizeArray{Float64, 1, Memory{Float64}}:
   3.14
  -4.2
   2.68
 ```
+
+See the Collects.jl Readme for more information.
 
 ## `BoundsErrorLight` exception
 

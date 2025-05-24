@@ -5,7 +5,7 @@
 FixedSizeArrays supports the [standard array interfaces](https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array), so things like broadcasting, matrix multiplication, other linear algebra operations, `similar`, `copyto!` or `map` should just work.
 
 Use the constructors to convert from other array types.
-Use [`collect_as`](@ref) to convert from arbitrary iterators.
+Use `collect_as` from the [Collects.jl](https://github.com/JuliaCollections/Collects.jl) package to convert from arbitrary iterators.
 
 ## Comparison with other array types
 
