@@ -1,8 +1,10 @@
 [deps]
+CollectAs = "08986516-18db-4a8b-8eaa-f5ef1828d8f1"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 FixedSizeArrays = "3821ddf9-e5b5-40d5-8e25-6813ab96b5e2"
 
 [compat]
+CollectAs = "1"
 Documenter = "1"
 
 [sources]

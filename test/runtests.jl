@@ -1,5 +1,6 @@
 using Test
 using FixedSizeArrays
+using CollectAs: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
 import Aqua
@@ -509,11 +510,11 @@ end
                     @test_throws ArgumentError collect_as(T, iterator)
                 end
             end
-            @test_throws ArgumentError collect_as(FSA{Int, -1}, 7:8)
+            @test_throws DimensionMismatch collect_as(FSA{Int, -1}, 7:8)
             @test_throws TypeError collect_as(FSA{Int, 3.1}, 7:8)
             for T ∈ (FSA{3}, FSV{3})
                 iterator = (7:8, (7, 8))
-                @test_throws TypeError collect_as(T, iterator)
+                @test_throws MethodError collect_as(T, iterator)
             end
             @testset "buggy iterator with mismatched `size` and `length" begin
                 for iterator ∈ (Iter((), 0, 7), Iter((3, 2), 5, 7))
@@ -539,6 +540,7 @@ end
                 (E, dim_count) = abstract_array_params(a)
                 af = collect(Float64, iterator)
                 @test abstract_array_params(af) == (Float64, dim_count)  # meta
+                iszero(dim_count) ||
                 @test_throws DimensionMismatch collect_as(FSA{E,dim_count+1}, iterator)
                 for T ∈ (FSA{E}, FSA{E,dim_count})
                     test_inferred(collect_as, FSA{E,dim_count}, (T, iterator))

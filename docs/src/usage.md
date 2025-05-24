@@ -64,14 +64,14 @@ To make it easier to refer to the concrete type `FixedSizeArray{T,N,Mem}` with t
 ## The `collect_as` utility
 
 The [array literals syntax](https://docs.julialang.org/en/v1/manual/arrays/#man-array-literals) `[A, B, C, ...]` to construct arrays is limited to `Base`'s `Array` and cannot be extended to custom array types.
-`FixedSizeArrays.jl` provides a convenient function [`collect_as`](@ref) to overcome this limitation and construct `FixedSizeArray`s out of any iterable:
+`CollectAs.jl` provides a convenient function, `collect_as`, to overcome this limitation and construct `FixedSizeArray`s out of any iterable:
 
 ```jldoctest
 julia> iter = (i for i ∈ 7:9 if i≠8);
 
 julia> using FixedSizeArrays
 
-julia> const ca = FixedSizeArrays.collect_as;
+julia> using CollectAs: collect_as as ca
 
 julia> ca(FixedSizeArray, iter)  # construct from an arbitrary iterator
 2-element FixedSizeArray{Int64, 1, Memory{Int64}}:
