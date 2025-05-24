@@ -470,7 +470,7 @@ end
                             test_inferred_noalloc(reshape, T, (a, shape2...))
                             b = reshape(a, shape2)
                             @test size(b) === shape2
-                            @test a.mem === b.mem
+                            @test underlying_storage(a) === underlying_storage(b)
                             @test a === reshape(b, shape1)
                         end
                     end
