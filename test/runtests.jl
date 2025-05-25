@@ -276,6 +276,11 @@ end
             test_inferred(similar, FSV{Int}, (FSV{Int}, (2,)))
             test_inferred(similar, FSV{Int}, (FSA{Int}, (2,)))
             example_abstract_vectors = (7:9, [7, 8, 9], OffsetArray([7, 8, 9], 1:3))
+            for T in (FSA{Int}, FSV{Int}), arr in example_abstract_vectors
+                # Don't allow conversion:
+                # <https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/120>.
+                @test_throws MethodError convert(T, arr)
+            end
         end
 
         @testset "FixedSizeMatrix" begin
@@ -294,6 +299,11 @@ end
                 reshape(1:9, (3, 3)),
                 OffsetArray(reshape(1:9, (3, 3)), 1:3, 1:3),
             )
+            for T in (FSA{Int}, FSM{Int}), arr in example_abstract_matrices
+                # Don't allow conversion:
+                # <https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/120>.
+                @test_throws MethodError convert(T, arr)
+            end
         end
 
         @testset "`map`" begin
