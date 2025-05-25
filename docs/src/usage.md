@@ -97,5 +97,5 @@ This exception type does not store the entire array for reporting the error mess
 
 !!! warning "Compatibility of exception raised"
 
-    We do not guarantee to always throw `BoundsErrorLight` when accessing and out-of-bound index of a `FixedSizeArray`.
+    We do not guarantee to throw either `BoundsError` or `BoundsErrorLight` when accessing an out-of-bound index of a `FixedSizeArray`.
     The exact exception raised may change at any point without breaking the semantic versioning compatibility contract.
