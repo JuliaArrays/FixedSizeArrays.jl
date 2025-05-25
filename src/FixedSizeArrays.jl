@@ -18,6 +18,5 @@ if isdefined(Base, :dataids) && (Base.dataids isa Function)
 end
 
 include("collect_as.jl")
-include("stdlibs.jl")
 
 end # module FixedSizeArrays
