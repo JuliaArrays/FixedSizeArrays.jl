@@ -264,10 +264,11 @@ end
             @test endswith(exc_text, "[2]")
         end
 
-        @testset "parent" begin
+        @testset "parent and parentindices" begin
             for size in ((4,), (3, 3), (2, 2, 2)), T in (UInt16, Int, Float32)
                 a = FixedSizeArray{T}(undef, size)
                 @test parent(a) === a.mem
+                @test parentindices(a) === (Base.OneTo(length(a)),)
             end
         end
 

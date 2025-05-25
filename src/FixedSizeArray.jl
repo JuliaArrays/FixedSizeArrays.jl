@@ -316,8 +316,11 @@ parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,Mem}}) where {Mem} = Mem
     parent(f::FixedSizeArray)
 
 Return the underlying parent object of the fixed-size array `f`.
+Use `parentindices(f)` to get the valid indices of the parent of `f`.
 """
 Base.parent(f::FixedSizeArray) = getfield(f, :mem)
+
+Base.parentindices(f::FixedSizeArray) = axes(parent(f))
 
 underlying_storage(m) = m
 underlying_storage(f::FixedSizeArray) = parent(f)
