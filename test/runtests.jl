@@ -267,8 +267,14 @@ end
         @testset "parent and parentindices" begin
             for size in ((4,), (3, 3), (2, 2, 2)), T in (UInt16, Int, Float32)
                 a = FixedSizeArray{T}(undef, size)
-                @test parent(a) === a.mem
+                a .= 1
+                p = parent(a)
+                @test p === a.mem
                 @test parentindices(a) === (Base.OneTo(length(a)),)
+                # Make sure all the parent indices are valid
+                for idx in Base.CartesianIndex.(collect.(parentindices(a))...)
+                    @test p[idx] == 1
+                end
             end
         end
 
