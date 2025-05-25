@@ -264,6 +264,13 @@ end
             @test endswith(exc_text, "[2]")
         end
 
+        @testset "parent" begin
+            for size in ((4,), (3, 3), (2, 2, 2)), T in (UInt16, Int, Float32)
+                a = FixedSizeArray{T}(undef, size)
+                @test parent(a) === a.mem
+            end
+        end
+
         @testset "FixedSizeVector" begin
             v = FSV{Float64}(undef, 3)
             @test length(v) == 3
@@ -470,7 +477,7 @@ end
                             test_inferred_noalloc(reshape, T, (a, shape2...))
                             b = reshape(a, shape2)
                             @test size(b) === shape2
-                            @test underlying_storage(a) === underlying_storage(b)
+                            @test parent(a) === parent(b)
                             @test a === reshape(b, shape1)
                         end
                     end

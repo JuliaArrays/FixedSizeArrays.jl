@@ -1,8 +1,7 @@
 export
     BoundsErrorLight,
     FixedSizeArray, FixedSizeVector, FixedSizeMatrix,
-    FixedSizeArrayDefault, FixedSizeVectorDefault, FixedSizeMatrixDefault,
-    underlying_storage
+    FixedSizeArrayDefault, FixedSizeVectorDefault, FixedSizeMatrixDefault
 
 """
     FixedSizeArray{T,N,Mem<:DenseVector{T}}(undef, size::NTuple{N,Int})
@@ -168,15 +167,15 @@ end
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
 Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray, i::Int)
     @boundscheck check_bounds_light(A, i)
-    @inbounds underlying_storage(A)[i]
+    @inbounds parent(A)[i]
 end
 Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray, x, i::Int)
     @boundscheck check_bounds_light(A, i)
-    @inbounds underlying_storage(A)[i] = x
+    @inbounds parent(A)[i] = x
     return A
 end
 
-Base.size(a::FixedSizeArray) = a.size
+Base.size(a::FixedSizeArray) = getfield(a, :size)
 
 function Base.similar(::T, ::Type{E}, size::NTuple{N,Int}) where {T<:FixedSizeArray,E,N}
     spec = TypeParametersElementTypeAndDimensionality()
@@ -184,7 +183,7 @@ function Base.similar(::T, ::Type{E}, size::NTuple{N,Int}) where {T<:FixedSizeAr
     S(undef, size)
 end
 
-Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(underlying_storage(a), i)
+Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(parent(a), i)
 
 # safe product of a tuple of integers, for calculating dimensions size
 
@@ -314,15 +313,14 @@ end
 parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,Mem}}) where {Mem} = Mem
 
 """
-    underlying_storage(f::FixedSizeArray)
+    parent(f::FixedSizeArray)
 
-Return the underlying storage used by `f`.
+Return the underlying parent object of the fixed-size array `f`.
 """
-underlying_storage(f::FixedSizeArray) = getfield(f, :mem)
+Base.parent(f::FixedSizeArray) = getfield(f, :mem)
 
-# Internal function, not to have a method of the public `underlying_storage` on `::Any`.
-_underlying_storage(m) = m
-_underlying_storage(f::FixedSizeArray) = underlying_storage(f)
+underlying_storage(m) = m
+underlying_storage(f::FixedSizeArray) = parent(f)
 
 axes_are_one_based(axes) = all(isone ∘ first, axes)
 
@@ -339,12 +337,12 @@ end
 # `copyto!`
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)
-    copyto!(_underlying_storage(dst), doff, _underlying_storage(src), soff, n)
+    copyto!(underlying_storage(dst), doff, underlying_storage(src), soff, n)
     dst
 end
 
 Base.@propagate_inbounds function copyto2!(dst, src)
-    copyto!(_underlying_storage(dst), _underlying_storage(src))
+    copyto!(underlying_storage(dst), underlying_storage(src))
     dst
 end
 
@@ -363,10 +361,10 @@ end
 
 # unsafe: the native address of the array's storage
 
-Base.cconvert(::Type{<:Ptr}, a::FixedSizeArray) = underlying_storage(a)
+Base.cconvert(::Type{<:Ptr}, a::FixedSizeArray) = parent(a)
 
 function Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T}
-    Base.unsafe_convert(Ptr{T}, underlying_storage(a))
+    Base.unsafe_convert(Ptr{T}, parent(a))
 end
 
 # `elsize`: part of the strided arrays interface, used for `pointer`
@@ -380,16 +378,16 @@ function Base.reshape(a::FixedSizeArray, size::(NTuple{N,Int} where {N}))
     if length(a) != len
         throw(DimensionMismatch("new shape not consistent with existing array length"))
     end
-    new_fixed_size_array(underlying_storage(a), size)
+    new_fixed_size_array(parent(a), size)
 end
 
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods
 
 function Base.iterate(a::FixedSizeArray)
-    iterate(underlying_storage(a))
+    iterate(parent(a))
 end
 function Base.iterate(a::FixedSizeArray, state)
-    iterate(underlying_storage(a), state)
+    iterate(parent(a), state)
 end
 
 """
