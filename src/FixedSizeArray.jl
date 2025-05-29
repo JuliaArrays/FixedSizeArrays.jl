@@ -337,6 +337,12 @@ function (::Type{FSA})(src::AbstractArray) where {FSA <: FixedSizeArray}
     collect_as(FSA, src)
 end
 
+# `copy`: avoid the `similar` and `copyto!` in the generic fallback
+
+function Base.copy(a::FixedSizeArray)
+    new_fixed_size_array(copy(Base.parent(a)), size(a))
+end
+
 # `copyto!`
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)

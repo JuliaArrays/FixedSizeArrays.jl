@@ -399,6 +399,12 @@ end
             end
         end
 
+        @testset "`copy`" begin
+            m = FixedSizeArray(rand(2, 2))::FixedSizeArray
+            @test m == copy(m)
+            @test m !== copy(m)
+        end
+
         @testset "`copyto!`" begin
             for (D, S) ∈ (
                 (Vector, FSV),
