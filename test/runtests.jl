@@ -403,6 +403,8 @@ end
             m = FixedSizeArray(rand(2, 2))::FixedSizeArray
             @test m == copy(m)
             @test m !== copy(m)
+            @test m == m[:]
+            @test m !== m[:]
         end
 
         @testset "`copyto!`" begin

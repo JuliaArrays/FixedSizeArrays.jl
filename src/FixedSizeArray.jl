@@ -343,6 +343,12 @@ function Base.copy(a::FixedSizeArray)
     new_fixed_size_array(copy(Base.parent(a)), size(a))
 end
 
+# `getindex` with a `Colon` for the index: better effects than with the generic fallback
+
+function Base.getindex(a::FixedSizeArray, ::Colon)
+    copy(a)
+end
+
 # `copyto!`
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)
