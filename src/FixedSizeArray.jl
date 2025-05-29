@@ -340,7 +340,7 @@ end
 # `copy`: avoid the `similar` and `copyto!` in the generic fallback
 
 function Base.copy(a::FixedSizeArray)
-    new_fixed_size_array(copy(a.mem), a.size)
+    new_fixed_size_array(copy(Base.parent(a)), getfield(a, :size))
 end
 
 # `copyto!`
