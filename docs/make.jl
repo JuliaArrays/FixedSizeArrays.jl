@@ -1,4 +1,17 @@
-using Documenter, FixedSizeArrays
+using Documenter: Documenter, makedocs, deploydocs
+using FixedSizeArrays
+using Changelog: Changelog
+
+const GITHUB_REPO = "JuliaArrays/FixedSizeArrays.jl"
+
+# Generate a Documenter-friendly changelog from CHANGELOG.md
+Changelog.generate(
+    Changelog.Documenter(),
+    joinpath(@__DIR__, "..", "CHANGELOG.md"),
+    joinpath(@__DIR__, "src", "release-notes.md");
+    repo = GITHUB_REPO,
+    branch = "main",
+)
 
 makedocs(
     modules = [FixedSizeArrays],
@@ -8,6 +21,7 @@ makedocs(
         "Installation" => "installation.md",
         "Usage" => "usage.md",
         "Reference" => "reference.md",
+        "Release Notes" => "release-notes.md",
     ],
     format = Documenter.HTML(
         ;
@@ -16,7 +30,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/JuliaArrays/FixedSizeArrays.jl.git",
+    repo = "github.com/$(GITHUB_REPO).git",
     target = "build",
     deps = nothing,
     make = nothing,

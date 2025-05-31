@@ -1,2 +1,5 @@
 Manifest.toml
 /docs/build/
+
+# File automatically generate by docs build system
+/docs/src/release-notes.md
