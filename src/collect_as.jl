@@ -49,8 +49,6 @@ function collect_as_haseltype(::Type{FSA}, iterator) where {T, FSA<:FixedSizeArr
 end
 
 function collect_as_haseltype(::Type{FSA}, iterator) where {FSA<:FixedSizeArray}
-    allowed = check_constructor_is_allowed(FSA)
-    val = with_stripped_type_parameters(TypeParametersElementType(), allowed)
-    typ = val_parameter(val){eltype(iterator)}
-    collect_as(typ, iterator)
+    T = check_constructor_is_allowed(FSA){eltype(iterator)}
+    collect_as(T, iterator)
 end

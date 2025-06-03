@@ -259,66 +259,6 @@ function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::
     Val{s}()
 end
 
-let
-    global with_stripped_type_parameters_unchecked
-    Disp = Union{
-        Type{FixedSizeArray},
-        Type{FixedSizeArray{T}} where {T},
-    }
-    function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Disp)
-        Val{FixedSizeArray}()
-    end
-end
-
-let
-    global with_stripped_type_parameters_unchecked
-    Disp = Union{
-        Type{FixedSizeArray{T, N} where {T}},
-        Type{FixedSizeArray{T, N}} where {T},
-    } where {N}
-    function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Disp{N}) where {N}
-        s = FixedSizeArray{T, N::Int} where {T}
-        Val{s}()
-    end
-end
-
-let
-    global with_stripped_type_parameters_unchecked
-    Disp = Type{FixedSizeArray{T, N, Mem} where {N}} where {T, Mem <: DenseVector{T}}
-    # `Base.@assume_effects :consistent` is a workaround for:
-    # https://github.com/JuliaLang/julia/issues/56966
-    Base.@assume_effects :consistent function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Disp{T, Mem}) where {T, Mem <: DenseVector{T}}
-        val = with_stripped_type_parameters(TypeParametersElementType(), Mem)
-        s = FixedSizeArray{T, N, val_parameter(val){T}} where {T, N}
-        Val{s}()
-    end
-end
-
-let
-    global with_stripped_type_parameters_unchecked
-    Disp = Type{FixedSizeArray{T, N, Mem}} where {T, N, Mem <: DenseVector{T}}
-    # `Base.@assume_effects :consistent` is a workaround for:
-    # https://github.com/JuliaLang/julia/issues/56966
-    Base.@assume_effects :consistent function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Disp{T, N, Mem}) where {T, N, Mem <: DenseVector{T}}
-        val = with_stripped_type_parameters(TypeParametersElementType(), Mem)
-        s = FixedSizeArray{T, N::Int, val_parameter(val){T}} where {T}
-        Val{s}()
-    end
-end
-
-for Mem ∈ (Vector, optional_memory...)
-    DispNoDim = Type{FixedSizeArray{T, N, Mem{T}} where {T, N}}
-    DispWithDim = Type{FixedSizeArray{T, N, Mem{T}} where {T}} where {N}
-    @eval function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::$DispNoDim)
-        s = FixedSizeArray{T, N, $Mem{T}} where {T, N}
-        Val{s}()
-    end
-    @eval function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::$DispWithDim{N}) where {N}
-        s = FixedSizeArray{T, N::Int, $Mem{T}} where {T}
-        Val{s}()
-    end
-end
-
 # `Base.@assume_effects :consistent` is a workaround for:
 # https://github.com/JuliaLang/julia/issues/56966
 Base.@assume_effects :consistent function with_stripped_type_parameters_unchecked(::TypeParametersElementTypeAndDimensionality, ::Type{<:(FixedSizeArray{T, N, Mem} where {T, N})}) where {Mem}
