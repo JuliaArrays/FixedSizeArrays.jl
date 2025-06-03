@@ -325,12 +325,23 @@ axes_are_one_based(axes) = all(isone ∘ first, axes)
 
 # converting constructors for copying other array types
 
-function (::Type{FSA})(src::AbstractArray) where {FSA <: FixedSizeArray}
+function converting_constructor(::Type{FSA}, src::AbstractArray) where {FSA <: FixedSizeArray}
     axs = axes(src)
     if !axes_are_one_based(axs)
         throw(DimensionMismatch("source array has a non-one-based indexing axis"))
     end
     collect_as_haseltype(FSA, src)
+end
+
+function (::Type{FSA})(src::AbstractArray) where {N, FSA <: FixedSizeArray{<:Any, N}}
+    if N::Int != ndims(src)
+        throw(DimensionMismatch("dimensionality mismatch"))
+    end
+    converting_constructor(FSA, src)
+end
+
+function (::Type{FSA})(src::AbstractArray) where {FSA <: FixedSizeArray}
+    converting_constructor(FSA, src)
 end
 
 # `copy`: avoid the `similar` and `copyto!` in the generic fallback

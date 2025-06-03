@@ -254,6 +254,8 @@ end
             @test [1, 2, 3] == (@inferred FSA(Real[1, 2, 3]))::FSV{Real}
             @test [1, 2, 3] == (@inferred FSV{Float32}([1, 2, 3]))::FSV{Float32}
             @test [1, 2, 3] == (@inferred FSA{Float32}([1, 2, 3]))::FSV{Float32}
+            @test_throws DimensionMismatch FSV(rand(Bool, 2, 2))
+            @test_throws DimensionMismatch FSV{Float32}(rand(Bool, 2, 2))
         end
 
         @testset "setindex!" begin
