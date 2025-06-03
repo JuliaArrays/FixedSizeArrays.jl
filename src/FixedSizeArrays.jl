@@ -1,5 +1,7 @@
 module FixedSizeArrays
 
+using Collects: Collect, collect_as
+
 include("BoundsErrorLight.jl")
 
 const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
