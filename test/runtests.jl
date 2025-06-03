@@ -256,6 +256,12 @@ end
             @test [1, 2, 3] == (@inferred FSA{Float32}([1, 2, 3]))::FSV{Float32}
             @test_throws DimensionMismatch FSV(rand(Bool, 2, 2))
             @test_throws DimensionMismatch FSV{Float32}(rand(Bool, 2, 2))
+            @test let v = FSV([1, 2, 3])
+                v == (@inferred FSV(v))::typeof(v)
+            end
+            @test let v = FSV([1, 2, 3])
+                v !== FSV(v)
+            end
         end
 
         @testset "setindex!" begin
