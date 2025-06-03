@@ -40,10 +40,7 @@ const FixedSizeArrayAllowedConstructorType = let
             # 0 fixed parameters
             Type{FixedSizeArray{T, N, Mem{T}} where {T, N}},
             # 1 fixed parameter
-            Type{FixedSizeArray{T, N, Mem{T}} where {N}} where {T},
             Type{FixedSizeArray{T, N, Mem{T}} where {T}} where {N},
-            # 2 fixed parameters
-            Type{FixedSizeArray{T, N, Mem{T}}} where {T, N},
         }
     end
     special_storage_types = (Vector, optional_memory...)
