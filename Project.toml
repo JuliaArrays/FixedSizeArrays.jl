@@ -1,7 +1,7 @@
 name = "FixedSizeArrays"
 uuid = "3821ddf9-e5b5-40d5-8e25-6813ab96b5e2"
-version = "0.1.0"
-authors = ["Mosè Giordano <mose@gnu.org>"]
+version = "1.0.0"
+authors = ["Mosè Giordano <mose@gnu.org>, Neven Sajko <s@purelymail.com>, Oscar Smith <oscar.smith@juliacomputing.com>, and contributors"]
 
 [deps]
 Collects = "08986516-18db-4a8b-8eaa-f5ef1828d8f1"
