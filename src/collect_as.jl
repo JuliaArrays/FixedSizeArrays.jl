@@ -37,6 +37,9 @@ end
 
 function (collect::Collect)(::Type{FSA}, iterator) where {FSA<:FixedSizeArray}
     T = check_constructor_is_allowed(FSA)
+    if iterator isa FSA
+        return copy(iterator)
+    end
     mem = parent_type_with_default(T)
     shape = inferred_shape(T, iterator)
     backing = collect(mem, iterator)
