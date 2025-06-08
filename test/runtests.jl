@@ -631,7 +631,8 @@ end
             rng1 = Random.seed!(rng, seed)
             Random.rand!(rng1, v)
             rng2 = Random.seed!(rng, seed)
-            Random.rand!(rng2, fv)
+            # Make sure `rand!` returns `fv` itself.
+            @test Random.rand!(rng2, fv) === fv
             # Make sure rand!(::FixedSizeArrays) generates same stream of
             # numbers as rand!(::Memory)
             @test v == fv
