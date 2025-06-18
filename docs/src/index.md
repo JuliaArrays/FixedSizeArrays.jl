@@ -1,8 +1,9 @@
 # FixedSizeArrays.jl
 
-[`FixedSizeArrays.jl`](https://github.com/JuliaArrays/FixedSizeArrays.jl) is a package for the [Julia programming language](https://julialang.org/) which implements mutable fixed-size arrays ([`FixedSizeArray`](@ref)), which means the length of the array can not change after construction and is amenable to be [constant-propagated](https://en.wikipedia.org/wiki/Constant_folding) at compile-time when possible.
+[`FixedSizeArrays.jl`](https://github.com/JuliaArrays/FixedSizeArrays.jl) is a package for the [Julia programming language](https://julialang.org/) which implements a [variable-length array](https://en.wikipedia.org/wiki/Variable-length_array) type ([`FixedSizeArray`](@ref)): this is a fixed-size array, whose size is set at runtime rather than at compile time, and whose elements are mutable.
+This means the size of a `FixedSizeArray` can not change after construction, and is amenable to be [constant-propagated](https://en.wikipedia.org/wiki/Constant_folding) by the compiler when possible.
 
-FixedSizeArrays supports the [standard array interfaces](https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array), so things like broadcasting, matrix multiplication, other linear algebra operations, `similar`, `copyto!` or `map` should just work.
+`FixedSizeArray` supports the [standard array interfaces](https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array), so things like broadcasting, matrix multiplication, other linear algebra operations, `similar`, `copyto!` or `map` should just work.
 
 Use the constructors to convert from other array types.
 Use `collect_as` from the [Collects.jl](https://github.com/JuliaCollections/Collects.jl) package to convert from arbitrary iterators.
@@ -27,7 +28,7 @@ You can see a showcase of performance/memory advantages of `FixedSizeArray` over
 Main differences between `FixedSizeArray` and `MArray` are:
 
 * `FixedSizeArray` is based on the `Memory` type introduced in Julia v1.11, `MArray` is backed by tuples, which are not efficient for long arrays (``\gg 100`` elements);
-* the size of the array is part of the type parameters of `MArray`, this isn't the case for `FixedSizeArray`, where the size is only a constant field of the data structure.
+* the size of the array is part of the type parameters of `MArray` (it has to be set at compile time), this isn't the case for `FixedSizeArray`, where the size is only a constant field of the data structure and can be set at runtime.
 
 There are applications where it may be desirable to dispatch on the size of an array, in that case `FixedSizeArray` would not be a good fit and you may consider using `MArray` instead.
 
