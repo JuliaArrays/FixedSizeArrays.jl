@@ -1,7 +1,7 @@
 # FixedSizeArrays.jl
 
 [`FixedSizeArrays.jl`](https://github.com/JuliaArrays/FixedSizeArrays.jl) is a package for the [Julia programming language](https://julialang.org/) which implements a [variable-length array](https://en.wikipedia.org/wiki/Variable-length_array) type ([`FixedSizeArray`](@ref)): this is a fixed-size array, whose size is set at runtime rather than at compile time, and whose elements are mutable.
-This means the size of a `FixedSizeArray` can not change after construction, and is amenable to be [constant-propagated](https://en.wikipedia.org/wiki/Constant_folding) at compile-time when possible.
+This means the size of a `FixedSizeArray` can not change after construction, and is amenable to be [constant-propagated](https://en.wikipedia.org/wiki/Constant_folding) by the compiler when possible.
 
 `FixedSizeArray` supports the [standard array interfaces](https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array), so things like broadcasting, matrix multiplication, other linear algebra operations, `similar`, `copyto!` or `map` should just work.
 
@@ -9,6 +9,17 @@ Use the constructors to convert from other array types.
 Use `collect_as` from the [Collects.jl](https://github.com/JuliaCollections/Collects.jl) package to convert from arbitrary iterators.
 
 ## Comparison with other array types
+
+Here is a quick summary of high-level differences between some different array types:
+
+|                  | Size set at... | Data backend | Growable | Mutable elements |
+|------------------|----------------|--------------|----------|------------------|
+| `Base.Array`     | runtime        | `MemoryRef`  | ✅       | ✅               |
+| `FixedSizeArray` | runtime        | `Memory`     | ❌       | ✅               |
+| `MArray`         | compile time   | `Tuple`      | ❌       | ✅               |
+| `SArray`         | compile time   | `Tuple`      | ❌       | ❌               |
+
+In the following sections we elaborate on the properties and strengths of the various types.
 
 ### `Array` from `Base`
 
