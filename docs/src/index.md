@@ -13,7 +13,7 @@ Here is a quick summary of high-level differences between some different array t
 
 |                  | Size set at... | Data backend | Growable | Mutable elements |
 |------------------|----------------|--------------|----------|------------------|
-| `Base.Array`     | runtime        | `MemoryRef`  | ✅       | ✅               |
+| `Base.Array`     | runtime        | `Memory`     | ✅       | ✅               |
 | `FixedSizeArray` | runtime        | `Memory`     | ❌       | ✅               |
 | `MArray`         | compile time   | `Tuple`      | ❌       | ✅               |
 | `SArray`         | compile time   | `Tuple`      | ❌       | ❌               |
