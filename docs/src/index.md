@@ -9,6 +9,17 @@ Use `collect_as` from the [Collects.jl](https://github.com/JuliaCollections/Coll
 
 ## Comparison with other array types
 
+Here is a quick summary of high-level differences between some different array types:
+
+|                  | Size set at... | Data backend | Growable | Mutable elements |
+|------------------|----------------|--------------|----------|------------------|
+| `Base.Array`     | runtime        | `Memory`     | ✅       | ✅               |
+| `FixedSizeArray` | runtime        | `Memory`     | ❌       | ✅               |
+| `MArray`         | compile time   | `Tuple`      | ❌       | ✅               |
+| `SArray`         | compile time   | `Tuple`      | ❌       | ❌               |
+
+In the following sections we elaborate on the properties and strengths of the various types.
+
 ### `Array` from `Base`
 
 While `Base`'s `Array` is a convenient multi-dimensional container for continuous data, a fixed-size array is what is employed in most linear algebra applications, where the size of [tensors](https://en.wikipedia.org/wiki/Tensor) typically does not change.
