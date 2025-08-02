@@ -369,6 +369,23 @@ end
             test_inferred(bm, TVI, (v3,  3))
             test_inferred(bp, TVF, (v3, .3))
             test_inferred(bm, TVF, (v3, .3))
+            @testset "views" begin
+                va = @view TVI(1:3)[1:2]
+                vb = @view TVI(4:6)[2:3]
+                vf2 = TVF(7:8)
+                test_inferred(+,  TVI, (va,  vb))
+                test_inferred(+,  TVF, (va, vf2))
+                test_inferred(+,  TVF, (vf2, vb))
+                test_inferred(bp, TVI, (va, vb))
+                test_inferred(bp, TVF, (va, vf2))
+                test_inferred(bp, TVF, (vf2, vb))
+                test_inferred(-,  TVI, (va, vb))
+                test_inferred(-,  TVF, (va, vf2))
+                test_inferred(-,  TVF, (vf2, vb))
+                test_inferred(bm, TVI, (va, vb))
+                test_inferred(bm, TVF, (va, vf2))
+                test_inferred(bm, TVF, (vf2, vb))
+            end
             @testset "matrices" begin
                 TMI = FSM{Int}
                 TMF = FSM{Float64}
@@ -390,6 +407,20 @@ end
                 test_inferred(bm, TMI, (m33,   3))
                 test_inferred(bp, TMF, (m33,  .3))
                 test_inferred(bm, TMF, (m33,  .3))
+                vm22 = @view m33[1:2, 2:3]
+                mf22 = TMF(undef, 2, 2)
+                test_inferred(+,  TMI, (vm22, vm22))
+                test_inferred(+,  TMF, (vm22, mf22))
+                test_inferred(+,  TMF, (mf22, vm22))
+                test_inferred(bp, TMI, (vm22, vm22))
+                test_inferred(bp, TMF, (vm22, mf22))
+                test_inferred(bp, TMF, (mf22, vm22))
+                test_inferred(-,  TMI, (vm22, vm22))
+                test_inferred(-,  TMF, (vm22, mf22))
+                test_inferred(-,  TMF, (mf22, vm22))
+                test_inferred(bm, TMI, (vm22, vm22))
+                test_inferred(bm, TMF, (vm22, mf22))
+                test_inferred(bm, TMF, (mf22, vm22))
             end
         end
 
