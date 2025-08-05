@@ -221,7 +221,8 @@ function (::Type{<:(FixedSizeArrayBroadcastStyle{N, Mem} where {N})})(::Val{M}) 
     FixedSizeArrayBroadcastStyle{m, Mem}()  # `FixedSizeArray` supports any dimensionality
 end
 
-function Base.BroadcastStyle(::Type{<:(FixedSizeArray{T, N, Mem} where {T})}) where {N, Mem}
+function Base.BroadcastStyle(::Union{Type{<:(FixedSizeArray{T, N, Mem} where {T})},
+                                     Type{<:(SubArray{T, N, FixedSizeArray{T, N, Mem}} where {T})}}) where {N, Mem}
     n = check_count_value(N)
     spec = TypeParametersElementType()
     mem = val_parameter(with_stripped_type_parameters(spec, Mem))
