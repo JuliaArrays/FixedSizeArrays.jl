@@ -8,11 +8,14 @@ Collects = "08986516-18db-4a8b-8eaa-f5ef1828d8f1"
 
 [weakdeps]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 
 [extensions]
 RandomExt = "Random"
+AdaptExt = "Adapt"
 
 [compat]
+Adapt = "4"
 Collects = "1"
 Random = "1"
 julia = "1.10"
