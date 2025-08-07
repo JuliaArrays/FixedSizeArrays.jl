@@ -1,4 +1,5 @@
 using Test
+using LinearAlgebra, Adapt
 using FixedSizeArrays
 using Collects: collect_as
 using OffsetArrays: OffsetArray
@@ -668,5 +669,13 @@ end
             # numbers as rand!(::Memory)
             @test v == fv
         end
+    end
+
+    @testset "Adapt" begin
+        # Preserver wrapper types:
+        arr = transpose([10 20; 30 14])
+        farr = adapt(FixedSizeArray, arr)
+        @test farr isa Transpose
+        @test parent(farr) isa FixedSizeArray
     end
 end
