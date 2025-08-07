@@ -34,6 +34,22 @@ julia> FixedSizeArray{Float64}(arr)  # construct from an `AbstractArray` value w
  30.0  14.0
 ```
 
+To "convert" a wrapper type like `Adjoint` while preserving the wrapper structure, you can use `Adapt`:
+
+```jldoctest
+julia> using FixedSizeArrays, Adapt
+
+julia> arr = transpose([10 20; 30 14])
+2×2 transpose(::Matrix{Int64}) with eltype Int64:
+ 10  30
+ 20  14
+
+julia> adapt(FixedSizeArray, arr)
+2×2 transpose(::FixedSizeArray{Int64, 2, Memory{Int64}}) with eltype Int64:
+ 10  30
+ 20  14
+```
+
 For 1- and 2-dimensional arrays you can use the aliases [`FixedSizeVector`](@ref) and [`FixedSizeMatrix`](@ref), respectively:
 
 ```@repl
