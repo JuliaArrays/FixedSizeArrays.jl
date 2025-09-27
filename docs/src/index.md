@@ -48,3 +48,7 @@ There are applications where it may be desirable to dispatch on the size of an a
 
 This package is not related to a package with the same name by [`@SimonDanisch`](https://github.com/SimonDanisch/FixedSizeArrays.jl).
 That, earlier, package was one of the StaticArrays.jl-like packages in the pre-v1 days of Julia: <https://github.com/SimonDanisch/FixedSizeArrays.jl>.
+
+## Videos about `FixedSizeArrays.jl`
+
+* [FixedSizeArrays.jl: What Array probably should have been](https://www.youtube.com/watch?v=xWo-ttbSHgw), talk at JuliaCon '25 by Mosè Giordano, Oscar Smith, and Neven Sajko.
