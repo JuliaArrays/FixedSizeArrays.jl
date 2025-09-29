@@ -15,3 +15,7 @@ Find more in the manual:
 
 * [documentation of latest stable version](https://juliaarrays.github.io/FixedSizeArrays.jl/stable)
 * [documentation of in-development version](https://juliaarrays.github.io/FixedSizeArrays.jl/dev)
+
+## Videos about `FixedSizeArrays.jl`
+
+* [FixedSizeArrays.jl: What Array probably should have been](https://www.youtube.com/watch?v=xWo-ttbSHgw), talk at JuliaCon '25 by Mosè Giordano, Oscar Smith, and Neven Sajko.
