@@ -406,10 +406,7 @@ end
 
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods
 
-function Base.iterate(a::FixedSizeArray, i = firstindex(parent(a)))
-    i > lastindex(parent(a)) && return nothing
-    @inbounds parent(a)[i], i + 1
-end
+iterate(A::FixedSizeArray, i=1) = (@inline; (i - 1)%UInt < length(A)%UInt ? (@inbounds A[i], i + 1) : nothing)
 
 """
     FixedSizeArrayDefault{T,N}(undef, size::NTuple{N,Int})

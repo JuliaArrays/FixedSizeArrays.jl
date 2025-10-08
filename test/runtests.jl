@@ -706,6 +706,6 @@ end
             m[2] = 2
             m[3] = 3
             tuple(m...)
-       end[] == NTuple{3, Int}
+       end[] == NTuple{3, Int} broken = VERSION >= v"1.12-"
     end
 end
