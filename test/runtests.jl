@@ -698,4 +698,14 @@ end
         @test farr isa Transpose
         @test parent(farr) isa FixedSizeArray
     end
+
+    @testset "Constant-prop through iterate" begin
+        @test Base.return_types() do
+            m = FixedSizeArray{Int}(undef, 3)
+            m[1] = 1
+            m[2] = 2
+            m[3] = 3
+            tuple(m...)
+       end[] == NTuple{3, Int}
+    end
 end
