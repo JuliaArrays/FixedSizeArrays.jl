@@ -406,7 +406,7 @@ end
 
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods
 
-function Base.iterate(a::FixedSizeArray, i = firstindex(a))
+function Base.iterate(a::FixedSizeArray, i = firstindex(parent(a)))
     i > lastindex(parent(a)) && return nothing
     @inbounds parent(a)[i], i + 1
 end
