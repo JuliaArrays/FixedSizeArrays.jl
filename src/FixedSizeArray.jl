@@ -404,14 +404,9 @@ function Base.reshape(a::FixedSizeArray, size::(NTuple{N,Int} where {N}))
     new_fixed_size_array(parent(a), size)
 end
 
-# `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods
+# `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods (copied from `Base.Array`)
 
-function Base.iterate(a::FixedSizeArray)
-    iterate(parent(a))
-end
-function Base.iterate(a::FixedSizeArray, state)
-    iterate(parent(a), state)
-end
+Base.iterate(A::FixedSizeArray, i=1) = (@inline; (i - 1)%UInt < length(A)%UInt ? (@inbounds A[i], i + 1) : nothing)
 
 """
     FixedSizeArrayDefault{T,N}(undef, size::NTuple{N,Int})
