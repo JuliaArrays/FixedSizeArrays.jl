@@ -353,7 +353,7 @@ end
 
 # `getindex` with a `Colon` for the index: better effects than with the generic fallback
 
-function Base.getindex(a::FixedSizeArray, ::Colon)
+function Base.getindex(a::FixedSizeVector, ::Colon)
     copy(a)
 end
 

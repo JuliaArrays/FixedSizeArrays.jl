@@ -460,7 +460,7 @@ end
             m = FixedSizeArray(rand(2, 2))::FixedSizeArray
             @test m == copy(m)
             @test m !== copy(m)
-            @test m == m[:]
+            @test reshape(m, :) == m[:]
             @test m !== m[:]
         end
 
@@ -707,5 +707,14 @@ end
             m[3] = 3
             tuple(m...)
        end[] == NTuple{3, Int}
+    end
+
+    @testset "getindex with a single colon must return an `AbstractVector`" begin
+        for m in 0:3
+            @test let a = FixedSizeArray{Float32}(undef, ntuple(Returns(1), m))
+                a::AbstractArray{<:Any, m}
+                a[:] isa AbstractVector
+            end
+        end
     end
 end
