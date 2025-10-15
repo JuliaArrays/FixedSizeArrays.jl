@@ -353,8 +353,13 @@ end
 
 # `getindex` with a `Colon` for the index: better effects than with the generic fallback
 
-function Base.getindex(a::FixedSizeVector, ::Colon)
-    copy(a)
+function Base.getindex(a::FixedSizeArray, ::Colon)
+    c = copy(a)
+    if a isa AbstractVector
+        c
+    else
+        reshape(c, :)
+    end
 end
 
 # `copyto!`
