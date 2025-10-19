@@ -1,4 +1,4 @@
-module RandomExt
+module FixedSizeArraysRandomExt
 
 using Random: Random
 using FixedSizeArrays: FixedSizeArray
@@ -21,4 +21,4 @@ if VERSION < v"1.11"
     end
 end
 
-end # module RandomExt
+end # module FixedSizeArraysRandomExt
