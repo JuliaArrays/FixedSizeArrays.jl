@@ -309,10 +309,10 @@ end
             mat = FSM(rand(3, 3))
             @testset "`Base.rest`" begin
                 @test let (v...,) = vec
-                    v isa FSV
+                    v isa AbstractVector
                 end
                 @test let (v...,) = mat
-                    v isa FSV
+                    v isa AbstractVector
                 end
                 @test let (v...,) = vec
                     v == vec
