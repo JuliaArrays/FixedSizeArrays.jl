@@ -413,6 +413,12 @@ end
 
 Base.iterate(A::FixedSizeArray, i=1) = (@inline; (i - 1)%UInt < length(A)%UInt ? (@inbounds A[i], i + 1) : nothing)
 
+# destructuring interface: `Base.rest`: add a method of our own, improving performance
+
+function Base.rest(a::FixedSizeArray, i::Int = 1)
+    a[i:end]
+end
+
 """
     FixedSizeArrayDefault{T,N}(undef, size::NTuple{N,Int})
     FixedSizeArrayDefault{T,N}(undef, size1::Int, size2::Int, ...)
