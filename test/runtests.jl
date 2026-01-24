@@ -304,6 +304,25 @@ end
             end
         end
 
+        @testset "destructuring" begin
+            vec = FSV(rand(3))
+            mat = FSM(rand(3, 3))
+            @testset "`Base.rest`" begin
+                @test let (v...,) = vec
+                    v isa FSV
+                end
+                @test let (v...,) = mat
+                    v isa FSV
+                end
+                @test let (v...,) = vec
+                    v == vec
+                end
+                @test let (v...,) = mat
+                    v == reshape(mat, :)
+                end
+            end
+        end
+
         @testset "FixedSizeVector" begin
             v = FSV{Float64}(undef, 3)
             @test length(v) == 3
