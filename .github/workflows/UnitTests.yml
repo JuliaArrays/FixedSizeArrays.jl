@@ -34,7 +34,6 @@ jobs:
       matrix:
         julia_version:
           - "1.11"
-          - "1"
           - "nightly"
         os:
           - ubuntu-latest
@@ -63,7 +62,6 @@ jobs:
         julia_version:
           - "1.10"
           - "1.11"
-          - "1"
           - "nightly"
         os:
           - ubuntu-latest
