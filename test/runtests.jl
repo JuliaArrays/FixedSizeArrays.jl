@@ -560,12 +560,8 @@ end
                             @test prod(shape1) === prod(shape2) === len  # meta
                             T = FSA{elem_type,length(shape2)}
                             test_inferred_noalloc(reshape, T, (a, shape2))
-                            if VERSION >= v"1.12-" && length(shape2) > 2
-                                test_inferred(reshape, T, (a, shape2...))
-                                @test false broken=true # no allocations is broken, see #160
-                            else
-                                test_inferred_noalloc(reshape, T, (a, shape2...))
-                            end
+                            test_inferred(reshape, T, (a, shape2...))
+                            test_inferred_noalloc(((a, s) -> reshape(a, s...)), T, (a, shape2))
                             b = reshape(a, shape2)
                             @test size(b) === shape2
                             @test parent(a) === parent(b)
