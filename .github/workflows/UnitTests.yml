@@ -54,6 +54,33 @@ jobs:
         BUILD_IS_PRODUCTION_BUILD: ${{ matrix.build_is_production_build }}
       with:
         coverage: false
+  test-32-bit:
+    name: Julia 32-bit ${{ matrix.julia_version }} - ${{ matrix.os }} - ${{ matrix.julia-arch }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        julia_version:
+          - "1"
+        os:
+          - ubuntu-latest
+        build_is_production_build:
+          - true
+        julia-arch:
+          - x86
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v6
+    - uses: julia-actions/setup-julia@v2
+      with:
+        version: ${{ matrix.julia_version }}
+        arch: ${{ matrix.julia-arch }}
+    - uses: julia-actions/cache@v2
+    - uses: julia-actions/julia-runtest@v1
+      env:
+        BUILD_IS_PRODUCTION_BUILD: ${{ matrix.build_is_production_build }}
+      with:
+        coverage: false
   test-with-code-coverage:
     name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - with code coverage
     timeout-minutes: 20
