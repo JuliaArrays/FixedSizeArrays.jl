@@ -146,13 +146,8 @@ end
         test_inferred(FixedSizeVector{Int}, return_type, (undef, (3,)))
         iter = Iterators.filter(iseven, 3:7)
         @test collect_as(FixedSizeArray, iter) isa return_type
-        if VERSION >= v"1.12-"
-            # Not inferred, see #160
-            @test false broken=true
-        else
-            test_inferred(collect_as, return_type, (FixedSizeArray{Int}, iter))
-            test_inferred(collect_as, return_type, (FixedSizeVector{Int}, iter))
-        end
+        test_inferred(collect_as, return_type, (FixedSizeArray{Int}, iter))
+        test_inferred(collect_as, return_type, (FixedSizeVector{Int}, iter))
         arr = ([1, 2, 3],)
         test_inferred(FixedSizeArray, return_type, arr)
         test_inferred(FixedSizeVector, return_type, arr)
@@ -646,12 +641,7 @@ end
                 iszero(dim_count) ||
                 @test_throws DimensionMismatch collect_as(FSA{E,dim_count+1}, iterator)
                 for T ∈ (FSA{E}, FSA{E,dim_count})
-                    if v"1.12-" <= VERSION < v"1.13-"
-                        # Not inferred, see #160
-                        @test false broken=true
-                    else
-                        test_inferred(collect_as, FSA{E,dim_count}, (T, iterator))
-                    end
+                    test_inferred(collect_as, FSA{E,dim_count}, (T, iterator))
                     fsa = collect_as(T, iterator)
                     @test a == fsa
                     @test first(abstract_array_params(fsa)) <: E
@@ -665,12 +655,7 @@ end
                     @test first(abstract_array_params(fsa)) <: E
                 end
                 for T ∈ (FSA{Float64}, FSA{Float64,dim_count})
-                    if v"1.12-" <= VERSION < v"1.13-"
-                        # Not inferred, see #160
-                        @test false broken=true
-                    else
-                        test_inferred(collect_as, FSA{Float64,dim_count}, (T, iterator))
-                    end
+                    test_inferred(collect_as, FSA{Float64,dim_count}, (T, iterator))
                     fsa = collect_as(T, iterator)
                     @test af == fsa
                     @test first(abstract_array_params(fsa)) <: Float64

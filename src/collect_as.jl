@@ -2,19 +2,19 @@ function (::Collect)(::Type{<:(FixedSizeArray{E, N, Union{}} where {E, N})}, ::A
     throw(ArgumentError("`Union{}` not expected"))
 end
 
-function infer_ndims_impl(::Base.HasShape{N}) where {N}
+Base.@constprop :aggressive function infer_ndims_impl(::Base.HasShape{N}) where {N}
     N::Int
 end
 
-function infer_ndims_impl(::Base.IteratorSize)
+Base.@constprop :aggressive function infer_ndims_impl(::Base.IteratorSize)
     1
 end
 
-function infer_ndims(iterator)
+Base.@constprop :aggressive function infer_ndims(iterator)
     infer_ndims_impl(Base.IteratorSize(iterator))
 end
 
-function inferred_shape_impl(output_ndims::Int, iterator)
+Base.@constprop :aggressive function inferred_shape_impl(output_ndims::Int, iterator)
     if (!isone(output_ndims)) && (output_ndims != infer_ndims(iterator))
         throw(DimensionMismatch("mismatched dimensionalities"))
     end
@@ -27,11 +27,11 @@ function inferred_shape_impl(output_ndims::Int, iterator)
     end
 end
 
-function inferred_shape(::Type{<:(AbstractArray{T, N} where {T})}, iterator) where {N}
+Base.@constprop :aggressive function inferred_shape(::Type{<:(AbstractArray{T, N} where {T})}, iterator) where {N}
     inferred_shape_impl(N::Int, iterator)
 end
 
-function inferred_shape(::Type{<:AbstractArray}, iterator)
+Base.@constprop :aggressive function inferred_shape(::Type{<:AbstractArray}, iterator)
     inferred_shape_impl(infer_ndims(iterator), iterator)
 end
 
