@@ -163,13 +163,17 @@ end
 
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
 Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray, i::Int)
-    @boundscheck check_bounds_light(A, i)
+    @boundscheck checkbounds(A, i)
     @inbounds parent(A)[i]
 end
 Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray, x, i::Int)
-    @boundscheck check_bounds_light(A, i)
+    @boundscheck checkbounds(A, i)
     @inbounds parent(A)[i] = x
     return A
+end
+
+function Base.checkbounds(A::FixedSizeArray, is...)
+    checkbounds_lightboundserror(A, is...)
 end
 
 Base.size(a::FixedSizeArray) = getfield(a, :size)
