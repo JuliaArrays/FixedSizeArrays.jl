@@ -4,19 +4,14 @@ on:
   push:
     branches:
       - "main"
-    paths:
+    paths: &paths
       - '.github/workflows/UnitTests.yml'
       - 'ext/**'
       - 'src/**'
       - 'test/**'
       - 'Project.toml'
   pull_request:
-    paths:
-      - '.github/workflows/UnitTests.yml'
-      - 'ext/**'
-      - 'src/**'
-      - 'test/**'
-      - 'Project.toml'
+    paths: *paths
   release:
 
 concurrency:
