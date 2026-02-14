@@ -1,6 +1,7 @@
 using Test
 using LinearAlgebra, Adapt
 using FixedSizeArrays
+using FixedSizeArrays: checked_dims
 using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
@@ -18,8 +19,6 @@ const build_is_production_build = let v = get(ENV, build_is_production_build_env
         false
     end
 end::Bool
-
-const checked_dims = FixedSizeArrays.checked_dims
 
 # helpers for testing for allocation or suboptimal inference
 
@@ -103,9 +102,10 @@ end
 
     @testset "safe computation of length from dimensions size" begin
         @test isone(checked_dims(()))
+        max_size = Sys.WORD_SIZE == 32 ? 12 : 20
         for n ∈ 0:30
             t = Tuple(1:n)
-            if 20 < n
+            if n > max_size
                 @test_throws ArgumentError checked_dims(t)
             else
                 @test factorial(n) == prod(t) == checked_dims(t)
