@@ -160,7 +160,7 @@ end
         @test_throws MethodError FixedSizeMatrix(undef, 1, 1)
     end
 
-    (@isdefined Memory) && (get(ENV, "CHECK_BOUNDS", "yes") != "yes") &&
+    (@isdefined Memory) && (Base.JLOptions().check_bounds != 1) &&
     @testset "examples of heap allocation being optimized out" begin
         # source for some/all of these: https://github.com/JuliaArrays/FixedSizeArrays.jl/discussions/62
         @testset "constant folding: 1" begin
