@@ -222,6 +222,7 @@ end
         end
     end
 
+    @testset verbose=true "test sets for multiple supported storage types" begin
     for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
         FSV = fsv(storage_type)
         FSM = fsm(storage_type)
@@ -732,6 +733,7 @@ end
                 end
             end
         end
+    end
     end
 
     @testset "Random" begin
