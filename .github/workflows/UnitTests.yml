@@ -29,7 +29,6 @@ jobs:
       matrix:
         julia_check_bounds:
           - "yes"
-          - "auto"
         julia_version:
           - "1.10"
           - "1.11"
@@ -48,6 +47,16 @@ jobs:
           - julia_check_bounds: "yes"
             julia_version: '1'
             julia_arch: x86
+            os: ubuntu-latest
+            build_is_production_build: true
+          - julia_check_bounds: "auto"
+            julia_version: '1'
+            julia_arch: default
+            os: ubuntu-latest
+            build_is_production_build: true
+          - julia_check_bounds: "auto"
+            julia_version: 'pre'
+            julia_arch: default
             os: ubuntu-latest
             build_is_production_build: true
     runs-on: ${{ matrix.os }}
