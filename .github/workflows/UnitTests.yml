@@ -45,7 +45,8 @@ jobs:
         build_is_production_build:
           - true
         include:
-          - julia_version: '1'
+          - julia_check_bounds: "yes"
+            julia_version: '1'
             julia_arch: x86
             os: ubuntu-latest
             build_is_production_build: true
