@@ -160,6 +160,68 @@ end
         @test_throws MethodError FixedSizeMatrix(undef, 1, 1)
     end
 
+    # only run this testset when:
+    #
+    # * Julia is new enough for `Memory` to be available
+    #
+    # * bounds-checking is not forced on (so `--check-bounds=auto` or `--check-bounds=no`, but not `--check-bounds=yes`)
+    (@isdefined Memory) && (Base.JLOptions().check_bounds != 1) &&
+    @testset "examples of heap allocation being optimized out" begin
+        # source for some/all of these: https://github.com/JuliaArrays/FixedSizeArrays.jl/discussions/62
+        @testset "constant folding: 1" begin
+            function f()
+                v = FixedSizeVector{Float32}(undef, 9)
+                @noinline length(v)
+            end
+            test_inferred_noalloc(f, Int, ())
+        end
+        @testset "constant folding: 2" begin
+            function f()
+                v = FixedSizeVector{Float32}(undef, 9)
+                Random.rand!(v)
+                length(v)
+            end
+            test_inferred_noalloc(f, Int, ())
+        end
+        @testset "constant folding: 3" begin
+            function f()
+                v = FixedSizeVector{Float32}(undef, 9)
+                Random.rand!(v)
+                sum(v)
+            end
+            test_inferred_noalloc(f, Float32, ())
+        end
+        @testset "constant folding: 4" begin
+            function f()
+                v = FixedSizeVector{Float32}(undef, 9)
+                Random.rand!(v)
+                foldl(+, v)
+            end
+            test_inferred_noalloc(f, Float32, ())
+        end
+        @testset "constant folding: 5" begin
+            function f()
+                v = FixedSizeVector{Float32}(undef, 9)
+                Random.rand!(v)
+                v[end]
+            end
+            test_inferred_noalloc(f, Float32, ())
+        end
+        @testset "allocation elimination without constant folding" begin
+            function f(n, d)
+                @inline let
+                    a = FixedSizeVector{Float32}(undef, 9)
+                    for i ∈ eachindex(a)
+                        a[i] = n + i
+                    end
+                    a[d] = 0
+                    reduce(+, a)
+                end
+            end
+            test_inferred_noalloc(f, Float32, (123, 3))
+        end
+    end
+
     for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
         FSV = fsv(storage_type)
         FSM = fsm(storage_type)
