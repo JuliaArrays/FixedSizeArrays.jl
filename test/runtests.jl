@@ -67,7 +67,7 @@ function test_we_do_not_own_the_call(func, arg_types)
     @test all(f, methods(func, arg_types))
 end
 
-@testset verbose=true showtiming=true "FixedSizeArrays" begin
+@testset verbose=true "FixedSizeArrays" begin
     @testset "meta" begin
         @test isempty(detect_ambiguities(Main))  # test for ambiguities in this file
     end
