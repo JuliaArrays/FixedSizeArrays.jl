@@ -160,6 +160,11 @@ end
         @test_throws MethodError FixedSizeMatrix(undef, 1, 1)
     end
 
+    # only run this testset when:
+    #
+    # * Julia is new enough for `Memory` to be available
+    #
+    # * bounds-checking is not forced on (so `--check-bounds=auto` or `--check-bounds=no`, but not `--check-bounds=yes`)
     (@isdefined Memory) && (Base.JLOptions().check_bounds != 1) &&
     @testset "examples of heap allocation being optimized out" begin
         # source for some/all of these: https://github.com/JuliaArrays/FixedSizeArrays.jl/discussions/62
