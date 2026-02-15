@@ -22,12 +22,16 @@ concurrency:
 
 jobs:
   test:
-    name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - ${{ matrix.julia_arch }}
+    name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - ${{ matrix.julia_arch }} - check_bounds=${{ matrix.julia_check_bounds }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
+        julia_check_bounds:
+          - "yes"
+          - "auto"
         julia_version:
+          - "1.10"
           - "1.11"
           - "1"
           - "pre"
@@ -57,6 +61,7 @@ jobs:
       env:
         BUILD_IS_PRODUCTION_BUILD: ${{ matrix.build_is_production_build }}
       with:
+        check_bounds: ${{ matrix.julia_check_bounds }}
         coverage: false
   test-with-code-coverage:
     name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - with code coverage
