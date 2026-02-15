@@ -37,13 +37,21 @@ jobs:
           - "nightly"
         os:
           - ubuntu-latest
-          - macos-latest
-          - windows-latest
         julia_arch:
           - default
         build_is_production_build:
           - true
         include:
+          - julia_check_bounds: "yes"
+            julia_version: '1'
+            julia_arch: default
+            os: macos-latest
+            build_is_production_build: true
+          - julia_check_bounds: "yes"
+            julia_version: '1'
+            julia_arch: default
+            os: windows-latest
+            build_is_production_build: true
           - julia_check_bounds: "yes"
             julia_version: '1'
             julia_arch: x86
