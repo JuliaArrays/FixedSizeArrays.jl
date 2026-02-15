@@ -344,6 +344,9 @@ end
                 @test_throws BoundsErrorLight v0[1] = 7
                 @test_throws BoundsErrorLight v1[2] = 7
                 @test_throws ["LightBoundsError: ", "[2]"] v1[2]
+                @test_throws BoundsErrorLight v0[]
+                @test_throws BoundsErrorLight v0[1, 1]
+                @test_throws BoundsErrorLight v0[1, 1, 1]
             end
 
             @testset "parent and parentindices" begin
