@@ -343,9 +343,10 @@ end
                 @test_throws BoundsErrorLight v1[2]
                 @test_throws BoundsErrorLight v0[1] = 7
                 @test_throws BoundsErrorLight v1[2] = 7
-                exc_text = sprint(showerror, BoundsErrorLight(typeof(v1), size(v1), 2))
-                @test startswith(exc_text, "BoundsErrorLight: ")
-                @test endswith(exc_text, "[2]")
+                @test_throws ["LightBoundsError: ", "[2]"] v1[2]
+                @test_throws BoundsErrorLight v0[]
+                @test_throws BoundsErrorLight v0[1, 1]
+                @test_throws BoundsErrorLight v0[1, 1, 1]
             end
 
             @testset "parent and parentindices" begin

@@ -108,7 +108,7 @@ See the Collects.jl Readme for more information.
 
 ## `BoundsErrorLight` exception
 
-To facilitate the [escape analysis](https://en.wikipedia.org/wiki/Escape_analysis) of `FixedSizeArray`s, accessing an out-of-bound index of these arrays raises a [`BoundsErrorLight`](@ref) exception when possible.
+To facilitate the [escape analysis](https://en.wikipedia.org/wiki/Escape_analysis) of `FixedSizeArray`s, accessing an out-of-bound index of these arrays raises a `BoundsErrorLight` exception when possible.
 This exception type does not store the entire array for reporting the error message, thus enabling more performance optimizations compared to arrays which throw [`BoundsError`](https://docs.julialang.org/en/v1/base/base/#Core.BoundsError) exceptions.
 
 !!! warning "Compatibility of exception raised"

@@ -14,7 +14,6 @@ FixedSizeArrayDefault
 FixedSizeVectorDefault
 FixedSizeMatrixDefault
 Base.parent
-BoundsErrorLight
 ```
 
 ## Internal API

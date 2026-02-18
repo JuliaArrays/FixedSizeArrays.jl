@@ -5,6 +5,7 @@ authors = ["Mosè Giordano <mose@gnu.org>, Neven Sajko <s@purelymail.com>, Oscar
 
 [deps]
 Collects = "08986516-18db-4a8b-8eaa-f5ef1828d8f1"
+LightBoundsErrors = "e21c612c-4641-4669-b9c3-3f4360ced9da"
 
 [weakdeps]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
@@ -17,5 +18,6 @@ FixedSizeArraysAdaptExt = "Adapt"
 [compat]
 Adapt = "4"
 Collects = "1"
+LightBoundsErrors = "1"
 Random = "1"
 julia = "1.10"
