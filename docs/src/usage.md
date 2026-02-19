@@ -115,3 +115,7 @@ This exception type does not store the entire array for reporting the error mess
 
     We do not guarantee to throw either `BoundsError` or `BoundsErrorLight` when accessing an out-of-bound index of a `FixedSizeArray`.
     The exact exception raised may change at any point without breaking the semantic versioning compatibility contract.
+
+!!! note
+
+    `BoundsErrorLight` is an alias for `LightBoundsError` from the [LightBoundsErrors.jl](https://github.com/JuliaArrays/LightBoundsErrors.jl) package.
