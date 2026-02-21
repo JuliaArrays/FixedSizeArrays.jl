@@ -30,7 +30,6 @@ jobs:
         julia_check_bounds:
           - "yes"
         julia_version:
-          - "1.10"
           - "1.11"
           - "1"
           - "pre"
@@ -88,7 +87,6 @@ jobs:
       fail-fast: false
       matrix:
         julia_version:
-          - "1.10"
           - "1.11"
           - "1"
           - "pre"
