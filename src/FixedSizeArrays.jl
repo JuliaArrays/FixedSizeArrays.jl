@@ -11,6 +11,7 @@ const optional_atomic_memory = (@isdefined AtomicMemory) ? (AtomicMemory,) : ()
 const optional_generic_memory = (@isdefined GenericMemory) ? (GenericMemory,) : ()
 
 include("FixedSizeArray.jl")
+include("FixedSizeBitArray.jl")
 
 if isdefined(Base, :dataids) && (Base.dataids isa Function)
     # This is an internal, non-public function which is nevertheless needed to
