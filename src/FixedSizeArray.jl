@@ -188,9 +188,9 @@ Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(parent(a), i)
 
 # safe product of a tuple of integers, for calculating dimensions size
 
-@noinline function throw_checked_dims()
-    msg = """
-    invalid array dimensions, check if:
+@noinline function throw_checked_dims(shape::Tuple)
+    msg = lazy"""
+    invalid array dimensions $shape, check if:
     * any dim is negative
     * any dim is `typemax(T)`
     * trying to compute the total length overflows"""
@@ -201,7 +201,7 @@ checked_dims(::Tuple{}) = 1
 function checked_dims(t::Tuple{Int,Vararg{Int,N}}) where {N}
     product = checked_size_product(t)
     if product === nothing
-        throw_checked_dims()
+        throw_checked_dims(t)
     end
     product
 end
