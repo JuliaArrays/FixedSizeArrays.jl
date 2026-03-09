@@ -74,7 +74,7 @@ jobs:
       with:
         arch: ${{ matrix.julia_arch }}
         version: ${{ matrix.julia_version }}
-    - uses: julia-actions/cache@v2
+    - uses: julia-actions/cache@v3
     - uses: julia-actions/julia-runtest@v1
       env:
         BUILD_IS_PRODUCTION_BUILD: ${{ matrix.build_is_production_build }}
@@ -101,7 +101,7 @@ jobs:
     - uses: julia-actions/setup-julia@v2
       with:
         version: ${{ matrix.julia_version }}
-    - uses: julia-actions/cache@v2
+    - uses: julia-actions/cache@v3
     - uses: julia-actions/julia-runtest@v1
       env:
         BUILD_IS_PRODUCTION_BUILD: false
