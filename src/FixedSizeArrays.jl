@@ -1,5 +1,6 @@
 module FixedSizeArrays
 
+using CheckedSizeProduct: checked_size_product
 using Collects: Collect, collect_as
 using LightBoundsErrors: checkbounds_lightboundserror
 using LightBoundsErrors: LightBoundsError as BoundsErrorLight

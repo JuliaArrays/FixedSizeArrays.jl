@@ -188,30 +188,20 @@ Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(parent(a), i)
 
 # safe product of a tuple of integers, for calculating dimensions size
 
-checked_dims_impl(a::Int, ::Tuple{}, have_overflow::Bool) = (a, have_overflow)
-function checked_dims_impl(a::Int, t::Tuple{Int,Vararg{Int,N}}, have_overflow::Bool) where {N}
-    b = first(t)
-    (m, o) = Base.Checked.mul_with_overflow(a, b)
-    r = Base.tail(t)::NTuple{N,Int}
-    checked_dims_impl(m, r, have_overflow | o)::Tuple{Int,Bool}
+@noinline function throw_checked_dims(shape::Tuple)
+    msg = lazy"""
+    invalid array dimensions $shape, check if:
+    * any dim is negative
+    * any dim is `typemax(T)`
+    * trying to compute the total length overflows"""
+    throw(ArgumentError(msg))
 end
 
 checked_dims(::Tuple{}) = 1
 function checked_dims(t::Tuple{Int,Vararg{Int,N}}) where {N}
-    any_is_zero     = any(iszero,                 t)::Bool
-    any_is_negative = any((x -> x < false),       t)::Bool
-    any_is_typemax  = any((x -> x == typemax(x)), t)::Bool
-    a = first(t)
-    r = Base.tail(t)::NTuple{N,Int}
-    (product, have_overflow) = checked_dims_impl(a, r, false)::Tuple{Int,Bool}
-    if any_is_negative
-        throw(ArgumentError("array dimension size can't be negative"))
-    end
-    if any_is_typemax
-        throw(ArgumentError("array dimension size can't be the maximum representable value"))
-    end
-    if have_overflow & !any_is_zero
-        throw(ArgumentError("array dimensions too great, can't represent length"))
+    product = checked_size_product(t)
+    if product === nothing
+        throw_checked_dims(t)
     end
     product
 end
