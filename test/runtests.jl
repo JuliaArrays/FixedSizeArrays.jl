@@ -1,7 +1,7 @@
 using Test
 using LinearAlgebra, Adapt
 using FixedSizeArrays
-using FixedSizeArrays: checked_dims
+using FixedSizeArrays: checked_dims, UnsafeRefArray
 using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
@@ -137,7 +137,7 @@ end
 
     @testset "default underlying storage type" begin
         default = FixedSizeArrays.default_underlying_storage_type
-        @test default === (@isdefined(Memory) ? Memory : Vector)
+        @test default === (@isdefined(Memory) ? UnsafeRefArray : Vector)
         return_type = FixedSizeVector{Int,default{Int}}
         @test return_type === FixedSizeVectorDefault{Int}
         test_inferred(FixedSizeArray{Int}, return_type, (undef, 3))
@@ -223,7 +223,7 @@ end
     end
 
     @testset verbose=true "test sets for multiple supported storage types" begin
-        for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
+        for storage_type ∈ (((@isdefined Memory) ? (UnsafeRefArray,) : ())..., Vector)
             FSV = fsv(storage_type)
             FSM = fsm(storage_type)
             FSA = fsa(storage_type)
@@ -549,7 +549,7 @@ end
                     (FSV, FSV),
                     (
                         if @isdefined Memory
-                            ((FSV, Memory), (Memory, FSV))
+                            ((FSV, UnsafeRefArray), (UnsafeRefArray, FSV))
                         else
                             ()
                         end

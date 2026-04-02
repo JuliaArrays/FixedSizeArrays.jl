@@ -253,6 +253,12 @@ function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::
     s = GenericMemory{K, T, AS} where {T}
     Val{s}()
 end
+if (@isdefined UnsafeRefArray)
+    function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Type{<:UnsafeRefArray})
+        s = UnsafeRefArray
+        Val{s}()
+    end
+end
 
 # `Base.@assume_effects :consistent` is a workaround for:
 # https://github.com/JuliaLang/julia/issues/56966
