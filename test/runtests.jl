@@ -1,7 +1,10 @@
 using Test
 using LinearAlgebra, Adapt
 using FixedSizeArrays
-using FixedSizeArrays: checked_dims, UnsafeRefArray
+using FixedSizeArrays: checked_dims
+if @isdefined Memory
+    using FixedSizeArrays: UnsafeRefArray
+end
 using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
@@ -153,6 +156,31 @@ end
         test_inferred(FixedSizeVector, return_type, arr)
         test_inferred(FixedSizeArray{Int}, return_type, arr)
         test_inferred(FixedSizeVector{Int}, return_type, arr)
+    end
+
+    (@isdefined Memory) && @testset "UnsafeRefArray" begin
+        @testset "tuple undef constructor" begin
+            a = UnsafeRefArray{Int}(undef, (5,))
+            @test length(a) == 5
+        end
+        @testset "similar" begin
+            a = UnsafeRefArray{Int}(undef, 3)
+            b = similar(a, Float64, (4,))
+            @test b isa UnsafeRefArray{Float64}
+            @test length(b) == 4
+        end
+        @testset "collect_as identity" begin
+            a = UnsafeRefArray{Int}(undef, 3)
+            a[1] = 1; a[2] = 2; a[3] = 3
+            b = collect_as(UnsafeRefArray{Int}, a)
+            @test b isa UnsafeRefArray{Int}
+            @test b !== a
+            @test b[1] == 1 && b[2] == 2 && b[3] == 3
+            c = collect_as(UnsafeRefArray, a)
+            @test c isa UnsafeRefArray{Int}
+            @test c !== a
+            @test c[1] == 1 && c[2] == 2 && c[3] == 3
+        end
     end
 
     @testset "`undef` construction without element type" begin

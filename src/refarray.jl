@@ -15,6 +15,12 @@ end
 
 UnsafeRefArray{T}(::UndefInitializer, n::Tuple{Int}) where T = UnsafeRefArray{T}(undef, @inbounds(n[1]))
 
+@static if VERSION < v"1.12.0-DEV.966"
+    Base.parent(x::UnsafeRefArray) = x.ref.mem
+else
+    Base.parent(x::UnsafeRefArray) = parent(x.ref)
+end
+
 # This version introduced Base.memoryindex as public API
 @static if VERSION < v"1.13.0-DEV.1289"
     internal_memindex(x::MemoryRef) = Core.memoryrefoffset(x)
@@ -23,7 +29,11 @@ else
 end
 
 function Base.length(x::UnsafeRefArray)
-    length(parent(x.ref)) - internal_memindex(x.ref) + 1
+    length(parent(x)) - internal_memindex(x.ref) + 1
+end
+
+function Base.checkbounds(A::UnsafeRefArray, is...)
+    checkbounds_lightboundserror(A, is...)
 end
 
 Base.size(x::UnsafeRefArray) = (length(x),)
@@ -65,11 +75,7 @@ function Base.unsafe_convert(::Type{Ptr{T}}, x::UnsafeRefArray) where T
     Base.unsafe_convert(Ptr{T}, x.ref)
 end
 
-@static if VERSION < v"1.12.0-DEV.966"
-    Base.dataids(x::UnsafeRefArray) = Base.dataids(x.ref.mem)
-else
-    Base.dataids(x::UnsafeRefArray) = Base.dataids(parent(x.ref))
-end
+Base.dataids(x::UnsafeRefArray) = Base.dataids(parent(x))
 
 # Collects.jl interface for UnsafeRefArray
 

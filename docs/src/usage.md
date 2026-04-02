@@ -24,12 +24,12 @@ julia> arr = [10 20; 30 14]
  30  14
 
 julia> FixedSizeArray(arr)  # construct from an `AbstractArray` value
-2×2 FixedSizeArray{Int64, 2, Memory{Int64}}:
+2×2 FixedSizeArray{Int64, 2, FixedSizeArrays.UnsafeRefArray{Int64}}:
  10  20
  30  14
 
 julia> FixedSizeArray{Float64}(arr)  # construct from an `AbstractArray` value while converting element type
-2×2 FixedSizeArray{Float64, 2, Memory{Float64}}:
+2×2 FixedSizeArray{Float64, 2, FixedSizeArrays.UnsafeRefArray{Float64}}:
  10.0  20.0
  30.0  14.0
 ```
@@ -45,7 +45,7 @@ julia> arr = transpose([10 20; 30 14])
  20  14
 
 julia> adapt(FixedSizeArray, arr)
-2×2 transpose(::FixedSizeArray{Int64, 2, Memory{Int64}}) with eltype Int64:
+2×2 transpose(::FixedSizeArray{Int64, 2, FixedSizeArrays.UnsafeRefArray{Int64}}) with eltype Int64:
  10  30
  20  14
 ```
@@ -68,7 +68,7 @@ The `FixedSizeArray{T,N,Mem}` type has three parameters:
 
 !!! note "Implementation details"
 
-    In Julia v1.11+, the default memory backend is the [`Memory{T}`](https://docs.julialang.org/en/v1/base/arrays/#Core.Memory) type.
+    In Julia v1.11+, the default memory backend is `UnsafeRefArray{T}`, an internal type that wraps a `MemoryRef{T}`. This allows the pointer to be inlined into the `FixedSizeArray` struct, saving a memory indirection compared to `Memory{T}`.
     Since Julia v1.10 does not have the `Memory` type, to make this package usable also on Julia v1.10 `Vector{T}` is used as memory backend, but many of the memory/performance optimizations enabled by this package will not be available in that version of Julia and in general `FixedSizeArrays.jl` does not provide significant improvements compared to `Base`'s `Array` for that specific version.
 
 To make it easier to refer to the concrete type `FixedSizeArray{T,N,Mem}` with the default memory backend, the following convenient aliases are available:
@@ -88,17 +88,17 @@ julia> iter = (i for i ∈ 7:9 if i≠8);
 julia> using FixedSizeArrays, Collects
 
 julia> collect_as(FixedSizeArray, iter)  # construct from an arbitrary iterator
-2-element FixedSizeArray{Int64, 1, Memory{Int64}}:
+2-element FixedSizeArray{Int64, 1, FixedSizeArrays.UnsafeRefArray{Int64}}:
  7
  9
 
 julia> collect_as(FixedSizeArray{Float64}, iter)  # construct from an arbitrary iterator while converting element type
-2-element FixedSizeArray{Float64, 1, Memory{Float64}}:
+2-element FixedSizeArray{Float64, 1, FixedSizeArrays.UnsafeRefArray{Float64}}:
  7.0
  9.0
 
 julia> collect_as(FixedSizeVectorDefault, (3.14, -4.2, 2.68))  # construct from a tuple
-3-element FixedSizeArray{Float64, 1, Memory{Float64}}:
+3-element FixedSizeArray{Float64, 1, FixedSizeArrays.UnsafeRefArray{Float64}}:
   3.14
  -4.2
   2.68
