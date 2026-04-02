@@ -28,15 +28,11 @@ else
     internal_memindex(x::MemoryRef) = Base.memoryindex(x)
 end
 
-function Base.length(x::UnsafeRefArray)
-    length(parent(x)) - internal_memindex(x.ref) + 1
-end
-
 function Base.checkbounds(A::UnsafeRefArray, is...)
     checkbounds_lightboundserror(A, is...)
 end
 
-Base.size(x::UnsafeRefArray) = (length(x),)
+Base.size(x::UnsafeRefArray) = ((length(parent(x)) - internal_memindex(x.ref) + 1),)
 
 Base.firstindex(::UnsafeRefArray) = 1
 
