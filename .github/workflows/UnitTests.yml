@@ -70,7 +70,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v6
-    - uses: julia-actions/setup-julia@v2
+    - uses: julia-actions/setup-julia@v3
       with:
         arch: ${{ matrix.julia_arch }}
         version: ${{ matrix.julia_version }}
@@ -98,7 +98,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v6
-    - uses: julia-actions/setup-julia@v2
+    - uses: julia-actions/setup-julia@v3
       with:
         version: ${{ matrix.julia_version }}
     - uses: julia-actions/cache@v3
