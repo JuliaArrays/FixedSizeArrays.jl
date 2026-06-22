@@ -69,7 +69,7 @@ jobs:
             build_is_production_build: true
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: julia-actions/setup-julia@v3
       with:
         arch: ${{ matrix.julia_arch }}
@@ -97,7 +97,7 @@ jobs:
           - ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: julia-actions/setup-julia@v3
       with:
         version: ${{ matrix.julia_version }}
