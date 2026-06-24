@@ -184,7 +184,10 @@ function Base.similar(::T, ::Type{E}, size::NTuple{N,Int}) where {T<:FixedSizeAr
     S(undef, size)
 end
 
-Base.isassigned(a::FixedSizeArray, i::Int) = isassigned(parent(a), i)
+function Base.isassigned(a::FixedSizeArray, i::Int)
+    @boundscheck checkbounds(Bool, a, i) || return false
+    @inbounds isassigned(parent(a), i)
+end
 
 # safe product of a tuple of integers, for calculating dimensions size
 
