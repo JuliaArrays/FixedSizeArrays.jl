@@ -395,16 +395,10 @@ end
 
 Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
 
-@static if isdefined(Base, :try_strides)
-    @inline size_to_strides(s, d, sz...) = (s, size_to_strides(s * d, sz...)...)
-    size_to_strides(s, d) = (s,)
-    size_to_strides(s) = ()
-    function Base.try_strides(a::FixedSizeArray)
-        s = @something try_strides(parent(a)) return nothing
-        size_to_strides(only(s), size(a)...)
-    end
-    Base.is_ptr_loadable(a::FixedSizeArray) = is_ptr_loadable(parent(a))
-    Base.is_ptr_storable(a::FixedSizeArray) = is_ptr_storable(parent(a))
+@static if isdefined(Base, :is_strided)
+    Base.is_contiguous(::Type{A}) where {A<:FixedSizeArray} = true
+    Base.is_ptr_loadable(::Type{A}) where {A<:FixedSizeArray} = Base.is_ptr_loadable(parent_type(A))
+    Base.is_ptr_storable(::Type{A}) where {A<:FixedSizeArray} = Base.is_ptr_storable(parent_type(A))
 end
 
 # `reshape`: specializing it to ensure it returns a `FixedSizeArray`
