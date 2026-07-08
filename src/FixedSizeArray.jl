@@ -383,7 +383,9 @@ end
 
 # unsafe: the native address of the array's storage
 
-Base.cconvert(::Type{<:Ptr}, a::FixedSizeArray) = parent(a)
+function Base.cconvert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T}
+    Base.cconvert(Ptr{T}, parent(a))
+end
 
 function Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T}
     Base.unsafe_convert(Ptr{T}, parent(a))
@@ -392,6 +394,12 @@ end
 # `elsize`: part of the strided arrays interface, used for `pointer`
 
 Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
+
+@static if isdefined(Base, :is_strided)
+    Base.is_contiguous(::Type{A}) where {A<:FixedSizeArray} = true
+    Base.is_ptr_loadable(::Type{A}) where {A<:FixedSizeArray} = Base.is_ptr_loadable(parent_type(A))
+    Base.is_ptr_storable(::Type{A}) where {A<:FixedSizeArray} = Base.is_ptr_storable(parent_type(A))
+end
 
 # `reshape`: specializing it to ensure it returns a `FixedSizeArray`
 
