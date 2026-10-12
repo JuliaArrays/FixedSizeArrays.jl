@@ -384,6 +384,13 @@ for A ∈ (Array, optional_generic_memory...)  # Add more? Too bad we have to ha
     end
 end
 
+# `copy!`: avoid the `resize!` branch of `copy!(::AbstractVector, ::AbstractVector)`
+
+function Base.copy!(dst::FixedSizeVector, src::AbstractVector)
+    axes(dst) == axes(src) || throw(ArgumentError(lazy"arrays must have the same axes for copy! (consider using `copyto!`), got $(axes(dst)) and $(axes(src))"))
+    copyto!(dst, src)
+end
+
 # unsafe: the native address of the array's storage
 
 Base.cconvert(::Type{<:Ptr}, a::FixedSizeArray) = parent(a)

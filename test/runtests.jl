@@ -569,6 +569,18 @@ end
                 end
             end
 
+            @testset "`copy!`" begin
+                for S ∈ (Vector, FSV)
+                    s = S{Float64}(1:5)
+                    d = FSV{Float64}(undef, 5)
+                    test_inferred_noalloc(copy!, FSV{Float64}, (d, s))
+                    @test copy!(d, s) == 1:5
+                    # issue #194: no `resize!` fallback
+                    @test_throws ArgumentError copy!(FSV{Float64}(undef, 3), s)
+                    @test_throws "arrays must have the same axes for copy! (consider using `copyto!`), got (Base.OneTo(3),) and (Base.OneTo(5),)" copy!(FSV{Float64}(undef, 3), s)
+                end
+            end
+
             @testset "LinearAlgebra" begin
                 @testset "$T" for T in (Float16, Float32, Float64)
                     v = randn(T, 8)
