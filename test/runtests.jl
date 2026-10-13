@@ -364,6 +364,12 @@ end
             end
 
             @testset "`FixedSizeArrays.wrap`" begin
+                # `T` must be a static parameter here rather than a variable captured from the
+                # `for T` loop below: a closure capturing `T` holds it as a `DataType`, so the
+                # `wrap` call inside would be dynamically dispatched, and allocate (Julia v1.11).
+                function test_wrap_noalloc(::Type{T}, p) where {T}
+                    test_noalloc(p -> wrap(FixedSizeArray{T,3}, p, 2, 3, 4), (p,))
+                end
                 for T in (UInt16, Int, Float32)
                     p = storage_type{T}(undef, 24)
                     p .= 1:24
@@ -389,7 +395,7 @@ end
                     end
                     if storage_type !== Vector  # the `Vector` backend allocates on v1.10
                         test_noalloc(p -> wrap(FixedSizeArray, p, (4, 6)), (p,))
-                        test_noalloc(p -> wrap(FixedSizeArray{T,3}, p, 2, 3, 4), (p,))
+                        test_wrap_noalloc(T, p)
                     end
                     @test wrap(FixedSizeArray, p) isa FixedSizeArray{T,1,storage_type{T}}
                     @test Base.size(wrap(FixedSizeArray, p)) === (24,)
