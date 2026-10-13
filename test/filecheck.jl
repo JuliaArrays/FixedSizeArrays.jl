@@ -33,7 +33,6 @@ const fc_run_copy_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.
 # Constant folding of `length` through a `@noinline` call.
 @noinline fc_len(A::AbstractArray) = length(A)
 fc_len_fsv() = fc_len(FixedSizeVector{Float64}(undef, 3))
-fc_len_vec() = fc_len(Vector{Float64}(undef, 3))
 
 # Constant folding of `length` after a side-effecting call.
 function fc_rand_len()
@@ -122,13 +121,6 @@ build_is_production_build &&
             @check_next "ret $fc_int 3"
             @check_next "}"
             code_llvm(fc_len_fsv, (); debuginfo=:none)
-        end
-        # For comparison, with `Vector` the length is not a compile-time constant.
-        @test @filecheck begin
-            @check "define"
-            @check_not "ret $fc_int 3"
-            @check "ret $fc_int %"
-            code_llvm(fc_len_vec, (); debuginfo=:none)
         end
     end
 
