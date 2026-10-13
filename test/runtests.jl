@@ -1030,6 +1030,17 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
        end[] == NTuple{3, Int}
     end
 
+    @testset "`size` loads all dimensions at once" begin
+        # `size` must stay inferable and foldable, while passing each dimension through an
+        # intrinsic, see the comment at its definition (and issue #201).
+        for dims in ((3,), (2, 3), (2, 3, 4), (5, 4, 4, 4, 2))
+            a = FixedSizeArray{Float64}(undef, dims)
+            @test size(a) === dims
+            test_inferred(size, typeof(dims), (a,))
+            @test Core.Compiler.is_foldable(Base.infer_effects(size, (typeof(a),))) skip=!build_is_production_build
+        end
+    end
+
     @testset "getindex with a single colon must return an `AbstractVector`" begin
         for m in 0:3
             @test let a = FixedSizeArray{Float32}(undef, ntuple(Returns(1), m))

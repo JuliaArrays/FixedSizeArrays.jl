@@ -176,7 +176,17 @@ function Base.checkbounds(A::FixedSizeArray, is...)
     checkbounds_lightboundserror(A, is...)
 end
 
-Base.size(a::FixedSizeArray) = getfield(a, :size)
+# Load all dimensions at once. With a plain `getfield(a, :size)`, Julia's codegen loads
+# each dimension of a by-reference `FixedSizeArray` argument lazily, at its use. In a
+# short-circuiting check such as `axes(a) == expected || throw(...)` the loads of
+# dimensions 2:N then only happen in the conditional blocks of the `&&` chain, so they do
+# not dominate later uses in loops. LLVM's LICM later hoists the loads of the loop out of
+# conditionally executed inner loops and drops their `!tbaa`/`!invariant.load` metadata,
+# after which GVN can neither CSE them with the check nor use the checked values, so the
+# dimensions stay dynamic in the loop. Passing each dimension through an intrinsic forces
+# the tuple to be materialized here (as for `Array` and `PtrArray`) and is a no-op otherwise.
+Base.size(a::FixedSizeArray) = map(materialize_int, getfield(a, :size))
+materialize_int(n::Int) = Core.Intrinsics.bitcast(Int, n)
 
 function Base.similar(::T, ::Type{E}, size::NTuple{N,Int}) where {T<:FixedSizeArray,E,N}
     spec = TypeParametersElementTypeAndDimensionality()
