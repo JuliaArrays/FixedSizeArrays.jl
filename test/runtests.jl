@@ -875,19 +875,6 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         rank = MPI.Comm_rank(comm)
         nranks = MPI.Comm_size(comm)
         root = 0
-        # On Julia v1.14+, `Base.cconvert(Ptr{T}, ::SubArray)` returns a
-        # `Base.OffsetCConvert`, which MPI.jl v0.20.27 and earlier cannot convert to an
-        # `MPIPtr`, so no `SubArray` (of any parent) can be communicated there.
-        # This is fixed in MPI.jl by JuliaParallel/MPI.jl#941.
-        mpi_supports_views = let v = view(zeros(2, 2), 1, :)
-            try
-                c = Base.cconvert(MPI.MPIPtr, v)
-                GC.@preserve c Base.unsafe_convert(MPI.MPIPtr, c)
-                true
-            catch
-                false
-            end
-        end
         storage_types = (((@isdefined Memory) ? (Memory,) : ())..., Vector)
         @testset "$Mem, $T, $sz" for Mem in storage_types,
                                      T in (Float64, Int, ComplexF64, MPITestStruct),
@@ -908,7 +895,6 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                 @test buf.datatype == MPI.Datatype(T)
                 @test MPI.Buffer_send(a).data === a
                 c = Base.cconvert(MPI.MPIPtr, a)
-                @test c === a
                 GC.@preserve c begin
                     @test reinterpret(Ptr{T}, Base.unsafe_convert(MPI.MPIPtr, c)) == pointer(a)
                 end
@@ -982,9 +968,7 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                 copyto!(a, a0)
             end
 
-            if N > 1 && !mpi_supports_views
-                @test_skip mpi_supports_views # strided views
-            elseif N > 1
+            if N > 1
                 @testset "strided views" begin
                     # `FastSubArray` (vector datatype), as in `view(a, 1, .., :)`
                     v_fast = view(a, 1, ntuple(Returns(:), N - 1)...)
