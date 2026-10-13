@@ -172,6 +172,34 @@ Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::F
     return A
 end
 
+# Cartesian indexing: compute the linear index in Horner form,
+#     l = 1 + (i1 - 1) + s1 * ((i2 - 1) + s2 * ((i3 - 1) + ...)),
+# as StrideArraysCore.jl does for dense arrays, instead of the forward sum with stride
+# products used by Base (`(i1 - 1) + (i2 - 1) * s1 + (i3 - 1) * (s1 * s2) + ...`). Both are
+# the same value, but when a size check has made the dimensions compile-time constants LLVM
+# generates better address arithmetic for the Horner form in kernels accessing several
+# elements along the first dimension (one base offset shared by all of them).
+@inline horner_offset(::Tuple{Int}, I::Tuple{Int}) = I[1] - 1
+@inline horner_offset(s::Tuple{Int,Int,Vararg{Int}}, I::Tuple{Int,Int,Vararg{Int}}) =
+    (I[1] - 1) + s[1] * horner_offset(Base.tail(s), Base.tail(I))
+Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray{<:Any,N}, i1::Int, i2::Int, I::Vararg{Int}) where {N}
+    if N == length(I) + 2
+        @boundscheck checkbounds(A, i1, i2, I...)
+        @inbounds A[horner_offset(size(A), (i1, i2, I...)) + 1]
+    else
+        invoke(getindex, Tuple{AbstractArray, Vararg{Any}}, A, i1, i2, I...)
+    end
+end
+Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray{<:Any,N}, x, i1::Int, i2::Int, I::Vararg{Int}) where {N}
+    if N == length(I) + 2
+        @boundscheck checkbounds(A, i1, i2, I...)
+        @inbounds A[horner_offset(size(A), (i1, i2, I...)) + 1] = x
+        A
+    else
+        invoke(setindex!, Tuple{AbstractArray, Any, Vararg{Any}}, A, x, i1, i2, I...)
+    end
+end
+
 function Base.checkbounds(A::FixedSizeArray, is...)
     checkbounds_lightboundserror(A, is...)
 end
