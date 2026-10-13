@@ -5,11 +5,15 @@ using Collects: Collect, collect_as
 using LightBoundsErrors: checkbounds_lightboundserror
 using LightBoundsErrors: LightBoundsError as BoundsErrorLight
 
-const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
+if (@isdefined Memory)
+    include("refarray.jl")
+end
 
-const optional_memory = (@isdefined Memory) ? (Memory,) : ()
+const default_underlying_storage_type = (@isdefined Memory) ? UnsafeRefArray : Vector
+
+const optional_memory = (@isdefined Memory) ? (UnsafeRefArray,) : ()
 const optional_atomic_memory = (@isdefined AtomicMemory) ? (AtomicMemory,) : ()
-const optional_generic_memory = (@isdefined GenericMemory) ? (GenericMemory,) : ()
+const optional_generic_memory = (@isdefined GenericMemory) ? (UnsafeRefArray,) : ()
 
 include("FixedSizeArray.jl")
 

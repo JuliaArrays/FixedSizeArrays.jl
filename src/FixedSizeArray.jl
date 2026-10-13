@@ -256,6 +256,12 @@ function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::
     s = GenericMemory{K, T, AS} where {T}
     Val{s}()
 end
+if (@isdefined UnsafeRefArray)
+    function with_stripped_type_parameters_unchecked(::TypeParametersElementType, ::Type{<:UnsafeRefArray})
+        s = UnsafeRefArray
+        Val{s}()
+    end
+end
 
 # `Base.@assume_effects :consistent` is a workaround for:
 # https://github.com/JuliaLang/julia/issues/56966
@@ -428,7 +434,7 @@ end
     FixedSizeArrayDefault{T,N}(undef, size1::Int, size2::Int, ...)
     FixedSizeArrayDefault{T,N}(array::AbstractArray)
 
-Construct a [`FixedSizeArray`](@ref) with element type `T`, number of dimensions `N`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
+Construct a [`FixedSizeArray`](@ref) with element type `T`, number of dimensions `N`, and the default memory backend (`Vector{T}` on Julia v1.10, `UnsafeRefArray{T}` on Julia v1.11+).
 """
 const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_type{T}} where {T, N}
 """
@@ -436,7 +442,7 @@ const FixedSizeArrayDefault = FixedSizeArray{T, N, default_underlying_storage_ty
     FixedSizeVectorDefault{T}(undef, size1::Int)
     FixedSizeVectorDefault{T}(array::AbstractVector)
 
-Construct a [`FixedSizeVector`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
+Construct a [`FixedSizeVector`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `UnsafeRefArray{T}` on Julia v1.11+).
 """
 const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
 """
@@ -444,6 +450,6 @@ const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
     FixedSizeMatrixDefault{T}(undef, size1::Int, size2::Int)
     FixedSizeMatrixDefault{T}(array::AbstractMatrix)
 
-Construct a [`FixedSizeMatrix`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
+Construct a [`FixedSizeMatrix`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `UnsafeRefArray{T}` on Julia v1.11+).
 """
 const FixedSizeMatrixDefault = FixedSizeArrayDefault{T, 2} where {T}
