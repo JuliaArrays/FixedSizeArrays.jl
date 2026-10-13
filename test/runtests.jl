@@ -1037,7 +1037,7 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
             a = FixedSizeArray{Float64}(undef, dims)
             @test size(a) === dims
             test_inferred(size, typeof(dims), (a,))
-            @test Core.Compiler.is_foldable(Base.infer_effects(size, (typeof(a),)))
+            @test Core.Compiler.is_foldable(Base.infer_effects(size, (typeof(a),))) skip=!build_is_production_build
         end
     end
 
