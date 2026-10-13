@@ -2,6 +2,12 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version [v1.4.3](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.4.3) - Unreleased
+
+### Changed
+
+* `getindex` and `setindex!` with N `Int` indices compute the linear index in Horner form, `(i1 - 1) + s1 * ((i2 - 1) + s2 * (...))`, instead of Base's sum of stride products. Kernels accessing several elements along the first dimension then need one base offset plus constant offsets, which reduces the instruction count and register pressure. ([#206](https://github.com/JuliaArrays/FixedSizeArrays.jl/pull/206))
+
 ## Version [v1.4.2](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.4.2) - 2026-10-13
 
 ### Added

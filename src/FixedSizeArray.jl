@@ -175,10 +175,13 @@ end
 # Cartesian indexing: compute the linear index in Horner form,
 #     l = 1 + (i1 - 1) + s1 * ((i2 - 1) + s2 * ((i3 - 1) + ...)),
 # as StrideArraysCore.jl does for dense arrays, instead of the forward sum with stride
-# products used by Base (`(i1 - 1) + (i2 - 1) * s1 + (i3 - 1) * (s1 * s2) + ...`). Both are
-# the same value, but when a size check has made the dimensions compile-time constants LLVM
-# generates better address arithmetic for the Horner form in kernels accessing several
-# elements along the first dimension (one base offset shared by all of them).
+# products used by Base, `1 + (i1 - 1) + (i2 - 1) * s1 + (i3 - 1) * (s1 * s2) + ...`.
+# Both give the same value. With the Horner form, all elements that differ only in the
+# first index share the nested part `s1 * (...)` of the offset, so a kernel accessing
+# several of them, e.g. all variables `u[v, i, j, k, element]` of a node, needs one base
+# offset plus constant offsets. With the forward sum, LLVM reassociates the sum differently
+# per element and computes a separate offset for each one, which costs instructions and
+# registers.
 @inline horner_offset(::Tuple{Int}, I::Tuple{Int}) = I[1] - 1
 @inline horner_offset(s::Tuple{Int,Int,Vararg{Int}}, I::Tuple{Int,Int,Vararg{Int}}) =
     (I[1] - 1) + s[1] * horner_offset(Base.tail(s), Base.tail(I))
