@@ -1,7 +1,7 @@
 using Test
 using LinearAlgebra, Adapt
 using FixedSizeArrays
-using FixedSizeArrays: checked_dims
+using FixedSizeArrays: checked_dims, wrap
 using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
@@ -364,7 +364,6 @@ end
             end
 
             @testset "`FixedSizeArrays.wrap`" begin
-                wrap = FixedSizeArrays.wrap
                 for T in (UInt16, Int, Float32)
                     p = storage_type{T}(undef, 24)
                     p .= 1:24
