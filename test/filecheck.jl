@@ -277,12 +277,15 @@ build_is_production_build &&
     fc_run_size_reload_checks &&
     @testset "dimensions are not reloaded after a check of the size (issue #201)" begin
         # With `size` loading each dimension lazily, the second dimension of `du` was
-        # reloaded in the loop and used as a dynamic stride; the only loads of the second
-        # dimension must be the two in the size checks, one per argument.
+        # reloaded in the loop and used as a dynamic stride.  The only loads of the second
+        # dimension must be the two in the size checks, one per argument, and the strides
+        # must all be constants: no multiplication by a non-constant value.
         @test @filecheck begin
             @check "define"
+            @check_not "mul $fc_int %{{[^,]+}}, %"
             @check_count 2 "load $fc_int, ptr %\"[2]_ptr"
             @check_not "load $fc_int, ptr %\"[2]_ptr"
+            @check_not "mul $fc_int %{{[^,]+}}, %"
             @check "ret void"
             A = FixedSizeArrayDefault{Float64, 3}
             code_llvm(fc_201_kernel!, (A, A, Int); debuginfo=:none)
