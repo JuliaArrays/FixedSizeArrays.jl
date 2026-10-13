@@ -22,4 +22,8 @@ end
 
 include("collect_as.jl")
 
+@static if VERSION >= v"1.11.0-DEV.469"
+    eval(Expr(:public, :wrap))
+end
+
 end # module FixedSizeArrays

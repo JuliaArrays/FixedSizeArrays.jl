@@ -14,6 +14,7 @@ FixedSizeArrayDefault
 FixedSizeVectorDefault
 FixedSizeMatrixDefault
 Base.parent
+FixedSizeArrays.wrap
 ```
 
 ## Internal API

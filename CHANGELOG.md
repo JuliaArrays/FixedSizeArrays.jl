@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Version [v1.4.0](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.4.0) - Unreleased
 
+### Added
+
+* New public function `FixedSizeArrays.wrap` to construct a `FixedSizeArray` around an existing parent `DenseVector` (e.g. a `Memory` or a `Vector`) without copying it. ([#196](https://github.com/JuliaArrays/FixedSizeArrays.jl/pull/196))
+
 ### Changed
 
 * `BoundsErrorLight` is now an alias for `LightBoundsError` from the [`LightBoundsErrors.jl`](https://github.com/JuliaArrays/LightBoundsErrors.jl) package, instead of being a type defined in this package. As a consequence, the properties of the exception object and the error message have changed. ([#176](https://github.com/JuliaArrays/FixedSizeArrays.jl/pull/176))

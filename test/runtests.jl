@@ -1,7 +1,7 @@
 using Test
 using LinearAlgebra, Adapt
 using FixedSizeArrays
-using FixedSizeArrays: checked_dims
+using FixedSizeArrays: checked_dims, wrap
 using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
@@ -360,6 +360,75 @@ end
                     for idx in Base.CartesianIndex.(collect.(parentindices(a))...)
                         @test p[idx] == 1
                     end
+                end
+            end
+
+            @testset "`FixedSizeArrays.wrap`" begin
+                # `T` must be a static parameter here rather than a variable captured from the
+                # `for T` loop below: a closure capturing `T` holds it as a `DataType`, so the
+                # `wrap` call inside would be dynamically dispatched, and allocate (Julia v1.11).
+                function test_wrap_noalloc(::Type{T}, p) where {T}
+                    test_noalloc(p -> wrap(FixedSizeArray{T,3}, p, 2, 3, 4), (p,))
+                end
+                for T in (UInt16, Int, Float32)
+                    p = storage_type{T}(undef, 24)
+                    p .= 1:24
+                    for size in ((24,), (4, 6), (2, 3, 4), (2, 3, 2, 2))
+                        N = length(size)
+                        R = FixedSizeArray{T,N,storage_type{T}}
+                        for FSA_ in (FixedSizeArray, FixedSizeArray{T}, FixedSizeArray{T,N}, FSA, FSA{T}, FSA{T,N}, R)
+                            a = wrap(FSA_, p, size)
+                            @test a isa R
+                            @test parent(a) === p
+                            @test Base.size(a) === size
+                            @test a == reshape(1:24, size)
+                            @test wrap(FSA_, p, size...) === a
+                            test_inferred(wrap, R, (FSA_, p, size))
+                        end
+                        # no copy: writes are visible in both directions
+                        a = wrap(FixedSizeArray, p, size)
+                        a[end] = 100
+                        @test p[end] == 100
+                        p[1] = 200
+                        @test a[1] == 200
+                        p .= 1:24
+                    end
+                    if storage_type !== Vector  # the `Vector` backend allocates on v1.10
+                        test_noalloc(p -> wrap(FixedSizeArray, p, (4, 6)), (p,))
+                        test_wrap_noalloc(T, p)
+                    end
+                    @test wrap(FixedSizeArray, p) isa FixedSizeArray{T,1,storage_type{T}}
+                    @test Base.size(wrap(FixedSizeArray, p)) === (24,)
+                    @test Base.size(wrap(FixedSizeArray, p, Int8(4), UInt(6))) === (4, 6)
+                    # length mismatch
+                    @test_throws DimensionMismatch wrap(FixedSizeArray, p, (5, 5))
+                    @test_throws DimensionMismatch wrap(FixedSizeArray, p, 23)
+                    @test_throws DimensionMismatch wrap(FixedSizeArray, p, ())
+                    # invalid dimensions
+                    @test_throws ArgumentError wrap(FixedSizeArray, p, (-4, -6))
+                    # type parameters not matching `parent` or `size`
+                    @test_throws ArgumentError wrap(FixedSizeArray{Complex{T}}, p, (4, 6))
+                    @test_throws DimensionMismatch wrap(FixedSizeArray{T,3}, p, (4, 6))
+                    @test_throws DimensionMismatch wrap(FixedSizeVector, p, (4, 6))
+                    if @isdefined Memory
+                        other_storage = storage_type === Vector ? Memory : Vector
+                        @test_throws ArgumentError wrap(fsa(other_storage), p, (4, 6))
+                    end
+                end
+                # 0-dimensional
+                p = storage_type{Int}(undef, 1)
+                p[1] = 7
+                a = wrap(FixedSizeArray, p, ())
+                @test a isa FixedSizeArray{Int,0,storage_type{Int}}
+                @test a[] == 7
+                # re-wrapping a `Vector` after `resize!`
+                if storage_type === Vector
+                    v = collect(1:6)
+                    a = wrap(FixedSizeArray, v, (2, 3))
+                    resize!(v, 8)
+                    b = wrap(FixedSizeArray, v, (2, 4))
+                    @test parent(b) === v
+                    @test b == reshape(v, 2, 4)
                 end
             end
 
