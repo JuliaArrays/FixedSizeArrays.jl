@@ -115,19 +115,16 @@ fc_length(A) = length(A)
 # `copy`.
 fc_copy(A) = copy(A)
 
-# Reduced version of the kernel in issue #201: a check of the sizes of the arguments
-# followed by loops, one of which is conditionally executed, writing to `du`.
+# Reduced version of the kernel in issue #201: a check of the size of the argument
+# followed by loops, one of which is conditionally executed, writing to `du`.  All three
+# ingredients are needed to reproduce the issue: with a plain loop nest, or without the
+# stores, or with two dimensions only, the IR is the same with lazy and eager `size`.
 @noinline fc_201_throw_dm(ax) = throw(DimensionMismatch("unexpected axes $(ax)"))
-function fc_201_kernel!(du, u, nelem)
-    ax = (Base.OneTo(5), Base.OneTo(4), Base.OneTo(nelem))
-    axes(u) == ax || fc_201_throw_dm(axes(u))
-    axes(du) == ax || fc_201_throw_dm(axes(du))
+function fc_201_kernel!(du, nelem)
+    axes(du) == (Base.OneTo(5), Base.OneTo(4), Base.OneTo(nelem)) || fc_201_throw_dm(axes(du))
     for e in 1:nelem, i in 1:4
-        for ii in (i + 1):4
-            for v in 1:5
-                @inbounds du[v, i, e] += u[v, ii, e]
-                @inbounds du[v, ii, e] -= u[v, i, e]
-            end
+        for ii in (i + 1):4, v in 1:5
+            @inbounds du[v, ii, e] += 1.0
         end
     end
     return nothing
@@ -277,18 +274,17 @@ build_is_production_build &&
     fc_run_size_reload_checks &&
     @testset "dimensions are not reloaded after a check of the size (issue #201)" begin
         # With `size` loading each dimension lazily, the second dimension of `du` was
-        # reloaded in the loop and used as a dynamic stride.  The only loads of the second
-        # dimension must be the two in the size checks, one per argument, and the strides
-        # must all be constants: no multiplication by a non-constant value.
+        # reloaded in the loop and used as a dynamic stride.  The only load of the second
+        # dimension must be the one in the size check, and the strides must all be
+        # constants: no multiplication by a non-constant value.
         @test @filecheck begin
             @check "define"
             @check_not "mul $fc_int %{{[^,]+}}, %"
-            @check_count 2 "load $fc_int, ptr %\"[2]_ptr"
+            @check "load $fc_int, ptr %\"[2]_ptr"
             @check_not "load $fc_int, ptr %\"[2]_ptr"
             @check_not "mul $fc_int %{{[^,]+}}, %"
             @check "ret void"
-            A = FixedSizeArrayDefault{Float64, 3}
-            code_llvm(fc_201_kernel!, (A, A, Int); debuginfo=:none)
+            code_llvm(fc_201_kernel!, (FixedSizeArrayDefault{Float64, 3}, Int); debuginfo=:none)
         end
     end
 
