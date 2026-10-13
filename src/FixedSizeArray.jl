@@ -413,6 +413,74 @@ function Base.reshape(a::FixedSizeArray, size::(NTuple{N,Int} where {N}))
     new_fixed_size_array(parent(a), size)
 end
 
+# `wrap`: construct a `FixedSizeArray` around an existing memory backend, without copying
+
+"""
+    FixedSizeArrays.wrap(FixedSizeArray, parent::DenseVector, size::NTuple{N,Integer})
+    FixedSizeArrays.wrap(FixedSizeArray, parent::DenseVector, size1::Integer, size2::Integer, ...)
+    FixedSizeArrays.wrap(FixedSizeArray, parent::DenseVector)
+
+Return a [`FixedSizeArray`](@ref) of the given `size` which uses `parent` as its memory backend,
+without copying.
+`length(parent)` must be equal to `prod(size)`, otherwise a `DimensionMismatch` is thrown.
+Without `size`, the result is a vector of length `length(parent)`.
+
+The first argument can also be a more specific `FixedSizeArray` type, e.g.
+`FixedSizeArray{T,N,Mem}`: the element type, the number of dimensions and the memory backend
+are then checked against `parent` and `size`.
+
+The result shares its elements with `parent`, and `parent(FixedSizeArrays.wrap(FixedSizeArray, p, size)) === p`.
+Changing the length of `parent` (e.g. with `resize!` when `parent` is a `Vector`) while the
+result is in use is not allowed: wrap `parent` again after resizing it instead.
+
+This is similar to the (non-public) `Base.wrap(Array, mem, dims)` in Julia v1.11+,
+except that `parent` must have exactly the length of the result.
+
+# Examples
+
+```jldoctest
+julia> using FixedSizeArrays
+
+julia> v = collect(1:6);
+
+julia> a = FixedSizeArrays.wrap(FixedSizeArray, v, (2, 3));
+
+julia> size(a), parent(a) === v
+((2, 3), true)
+
+julia> a[2, 3] = 60;  # writes to `v`
+
+julia> v[6]
+60
+
+julia> resize!(v, 8);  # invalidates `a`
+
+julia> b = FixedSizeArrays.wrap(FixedSizeArray, v, 2, 4);  # wrap again after resizing
+
+julia> size(b), b[2, 3]
+((2, 4), 60)
+```
+"""
+function wrap(::Type{FSA}, parent::DenseVector, size::Tuple{Vararg{Integer}}) where {FSA <: FixedSizeArray}
+    size = check_ndims(FSA, size)
+    s = map(Int, size)
+    len = checked_dims(s)
+    if length(parent) != len
+        throw(DimensionMismatch(lazy"length of the parent ($(length(parent))) does not match the product of the dimensions $s"))
+    end
+    a = new_fixed_size_array(parent, s)
+    if !(a isa FSA)
+        throw(ArgumentError(lazy"a `FixedSizeArray` wrapping a `$(typeof(parent))` with $(length(s)) dimensions is not a `$FSA`"))
+    end
+    a
+end
+function wrap(::Type{FSA}, parent::DenseVector, size1::Integer, size::Vararg{Integer}) where {FSA <: FixedSizeArray}
+    wrap(FSA, parent, (size1, size...))
+end
+function wrap(::Type{FSA}, parent::DenseVector) where {FSA <: FixedSizeArray}
+    wrap(FSA, parent, (length(parent),))
+end
+
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods (copied from `Base.Array`)
 
 Base.iterate(A::FixedSizeArray, i=1) = (@inline; (i - 1)%UInt < length(A)%UInt ? (@inbounds A[i], i + 1) : nothing)
