@@ -245,6 +245,8 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         end
     end
 
+    include("filecheck.jl")
+
     @testset verbose=true "test sets for multiple supported storage types" begin
         for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
             FSV = fsv(storage_type)
