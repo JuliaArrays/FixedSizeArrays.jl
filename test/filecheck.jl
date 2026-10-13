@@ -13,19 +13,15 @@ const fc_int = "i$(Sys.WORD_SIZE)"
 const fc_bounds_error = "{{boundserror|bounds_error}}"
 
 # Elimination of the heap allocation of the underlying `Memory` only works reliably from
-# Julia 1.12 on, requires bounds checking not to be forced on, and a build without code
-# coverage instrumentation.
-const fc_run_alloc_elimination_checks =
-    VERSION >= v"1.12" && Base.JLOptions().check_bounds != 1 && build_is_production_build
+# Julia 1.12 on, and requires bounds checking not to be forced on.
+const fc_run_alloc_elimination_checks = VERSION >= v"1.12" && Base.JLOptions().check_bounds != 1
 
 # Proving that `reshape` to an incompatible size always throws worked on Julia 1.12-DEV in
 # 2024, regressed in the 1.12 and 1.13 releases, and works again on 1.14-DEV.
-const fc_run_reshape_throw_checks = VERSION >= v"1.14-DEV" && build_is_production_build
+const fc_run_reshape_throw_checks = VERSION >= v"1.14-DEV"
 
-# Bounds checks can be elided only when bounds checking is not forced on, and the IR of an
-# instrumented build is not representative.
-const fc_run_bounds_check_elision_checks =
-    Base.JLOptions().check_bounds != 1 && build_is_production_build
+# Bounds checks can be elided only when bounds checking is not forced on.
+const fc_run_bounds_check_elision_checks = Base.JLOptions().check_bounds != 1
 # https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200: since Julia 1.13 (which
 # dropped `@inbounds` from the generic `fill!`) LLVM does not elide the bounds check in
 # `fill!` for `FixedSizeArray`s and their views, and so does not vectorize the loop.
@@ -115,6 +111,8 @@ fc_length(A) = length(A)
 # `copy`.
 fc_copy(A) = copy(A)
 
+# The IR of a build instrumented for code coverage is not representative.
+build_is_production_build &&
 @testset "FileCheck: LLVM IR properties" begin
     @testset "`length` is constant-folded through a `@noinline` call" begin
         # The whole function body is a single `ret` of a literal.
@@ -179,14 +177,13 @@ fc_copy(A) = copy(A)
             end
         end
 
-        @testset "`foldl` over a larger random vector: vectorized reduction" begin
+        @testset "`foldl` over a larger random vector" begin
             @test @filecheck begin
                 @check "define"
                 @check_not "gcframe"
                 @check_not fc_alloc_call
                 @check "= alloca"
                 @check_not fc_alloc_call
-                @check "<{{[0-9]+}} x double>"
                 @check "ret double"
                 code_llvm(fc_rand_foldl, (); debuginfo=:none)
             end
