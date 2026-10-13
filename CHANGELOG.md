@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 * New public function `FixedSizeArrays.wrap` to construct a `FixedSizeArray` around an existing parent `DenseVector` (e.g. a `Memory` or a `Vector`) without copying it. ([#196](https://github.com/JuliaArrays/FixedSizeArrays.jl/pull/196))
+* Package extension with [`MPI.jl`](https://github.com/JuliaParallel/MPI.jl): `FixedSizeArray`s (and `SubArray`s of them) can now be used directly as communication buffers in MPI operations, e.g. `MPI.Send`, `MPI.Recv!`, `MPI.Bcast!`, `MPI.Allreduce!` and `MPI.Gatherv!`, by defining `MPI.Buffer(::FixedSizeArray)` and the conversion to `MPI.MPIPtr`.
 
 ### Changed
 
