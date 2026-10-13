@@ -1,5 +1,5 @@
 using Test
-using LinearAlgebra, Adapt
+using LinearAlgebra, Adapt, MPI
 using FixedSizeArrays
 using FixedSizeArrays: checked_dims, wrap
 using Collects: collect_as
@@ -66,6 +66,29 @@ function test_we_do_not_own_the_call(func, arg_types)
     end
     @test all(f, methods(func, arg_types))
 end
+
+
+# helpers for the MPI tests
+
+# `isbits` struct with padding, for which MPI.jl creates a derived datatype
+struct MPITestStruct
+    a::Float64
+    b::Int32
+end
+
+mpi_test_value(::Type{T}, i::Integer) where {T<:Real} = T(i)
+mpi_test_value(::Type{T}, i::Integer) where {T<:Complex} = T(i, -i)
+mpi_test_value(::Type{MPITestStruct}, i::Integer) = MPITestStruct(i, -i)
+
+# `DenseVector` which is neither a `Vector` nor a `Memory`, for testing that conversion to
+# `MPI.MPIPtr` is delegated to the parent of the `FixedSizeArray` (as for GPU arrays)
+struct MPITestVector{T} <: DenseVector{T}
+    v::Vector{T}
+end
+Base.size(x::MPITestVector) = size(x.v)
+Base.getindex(x::MPITestVector, i::Int) = x.v[i]
+Base.setindex!(x::MPITestVector, y, i::Int) = (x.v[i] = y; x)
+Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, x.v)
 
 @testset verbose=true "FixedSizeArrays" begin
     @testset "meta" begin
@@ -843,6 +866,158 @@ end
         farr = adapt(FixedSizeArray, arr)
         @test farr isa Transpose
         @test parent(farr) isa FixedSizeArray
+    end
+
+
+    @testset "MPI" begin
+        MPI.Initialized() || MPI.Init()
+        comm = MPI.COMM_WORLD
+        rank = MPI.Comm_rank(comm)
+        nranks = MPI.Comm_size(comm)
+        root = 0
+        storage_types = (((@isdefined Memory) ? (Memory,) : ())..., Vector)
+        @testset "$Mem, $T, $sz" for Mem in storage_types,
+                                     T in (Float64, Int, ComplexF64, MPITestStruct),
+                                     sz in ((6,), (2, 3), (2, 3, 4))
+            N = length(sz)
+            FSA = FixedSizeArray{T,N,Mem{T}}
+            a = FSA(undef, sz)
+            for i in eachindex(a)
+                a[i] = mpi_test_value(T, 10 * rank + i)
+            end
+            a0 = copy(a)
+
+            @testset "Buffer and pointer conversion" begin
+                buf = MPI.Buffer(a)
+                @test buf isa MPI.Buffer{FSA}
+                @test buf.data === a
+                @test buf.count == length(a)
+                @test buf.datatype == MPI.Datatype(T)
+                @test MPI.Buffer_send(a).data === a
+                c = Base.cconvert(MPI.MPIPtr, a)
+                GC.@preserve c begin
+                    @test reinterpret(Ptr{T}, Base.unsafe_convert(MPI.MPIPtr, c)) == pointer(a)
+                end
+            end
+
+            @testset "point-to-point to self" begin
+                b = FSA(undef, sz)
+                rreq = MPI.Irecv!(b, comm; source = rank, tag = 1)
+                sreq = MPI.Isend(a, comm; dest = rank, tag = 1)
+                MPI.Waitall([rreq, sreq])
+                @test b == a
+
+                c = FSA(undef, sz)
+                sreq = MPI.Isend(a, comm; dest = rank, tag = 2)
+                MPI.Recv!(c, comm; source = rank, tag = 2)
+                MPI.Wait(sreq)
+                @test c == a
+            end
+
+            @testset "collectives" begin
+                MPI.Bcast!(a, comm; root)
+                @test a == (rank == root ? a0 : mpi_test_value.(T, 1:length(a)))
+                copyto!(a, a0)
+
+                # gather the whole array, and a copy of a slice of it as in
+                # `vec(a[1, .., :])`
+                slice = N == 1 ? a[1:2] : vec(a[1, ntuple(Returns(:), N - 1)...])
+                for sendbuf in (a, slice)
+                    @test sendbuf isa FixedSizeArray
+                    n = length(sendbuf)
+                    recv = rank == root ?
+                           MPI.VBuffer(FixedSizeVector{T,Mem{T}}(undef, nranks * n),
+                                       fill(n, nranks)) : nothing
+                    MPI.Gatherv!(sendbuf, recv, comm; root)
+                    if rank == root
+                        @test recv.data isa FixedSizeVector
+                        @test recv.data[(rank * n + 1):((rank + 1) * n)] == vec(sendbuf)
+                    end
+                end
+
+                gathered = FixedSizeVector{T,Mem{T}}(undef, nranks * length(a))
+                MPI.Allgather!(a, MPI.UBuffer(gathered, length(a)), comm)
+                @test gathered[(rank * length(a) + 1):((rank + 1) * length(a))] == vec(a)
+
+                src = rank == root ?
+                      MPI.VBuffer(FixedSizeVector{T,Mem{T}}(mpi_test_value.(T, 1:(nranks * length(a)))),
+                                  fill(length(a), nranks)) : nothing
+                dst = FSA(undef, sz)
+                MPI.Scatterv!(src, dst, comm; root)
+                @test vec(dst) == mpi_test_value.(T, (rank * length(a) + 1):((rank + 1) * length(a)))
+            end
+
+            # user-defined reduction operators are not supported on all platforms
+            T == MPITestStruct || @testset "reductions" begin
+                b = FSA(undef, sz)
+                MPI.Allreduce!(a, b, +, comm)
+                expected = sum(r -> mpi_test_value.(T, 10 * r .+ (1:length(a))), 0:(nranks - 1))
+                @test vec(b) == expected
+                c = MPI.Allreduce(a, +, comm)
+                @test c isa FixedSizeArray{T,N}
+                @test vec(c) == expected
+                MPI.Allreduce!(a, +, comm)  # in place
+                @test vec(a) == expected
+                copyto!(a, a0)
+
+                d = FSA(undef, sz)
+                MPI.Reduce!(a, rank == root ? d : nothing, +, comm; root)
+                rank == root && @test vec(d) == expected
+                MPI.Reduce!(a, +, comm; root)  # in place on the root
+                rank == root && @test vec(a) == expected
+                copyto!(a, a0)
+            end
+
+            if N > 1
+                @testset "strided views" begin
+                    # `FastSubArray` (vector datatype), as in `view(a, 1, .., :)`
+                    v_fast = view(a, 1, ntuple(Returns(:), N - 1)...)
+                    # non-fast `SubArray` with unit ranges (subarray datatype), for which
+                    # `MPI.Buffer` stores the parent `FixedSizeArray`
+                    v_slow = view(a, 1:1, 2:size(a, 2), ntuple(Returns(:), N - 2)...)
+                    @test MPI.Buffer(v_slow).data === a
+                    for v in (v_fast, v_slow)
+                        b = Array{T}(undef, size(v))
+                        rreq = MPI.Irecv!(b, comm; source = rank, tag = 3)
+                        sreq = MPI.Isend(v, comm; dest = rank, tag = 3)
+                        MPI.Waitall([rreq, sreq])
+                        @test b == v
+
+                        # receive into a strided view of a `FixedSizeArray`
+                        c = FSA(undef, sz)
+                        fill!(c, mpi_test_value(T, 0))
+                        w = view(c, parentindices(v)...)
+                        rreq = MPI.Irecv!(w, comm; source = rank, tag = 4)
+                        sreq = MPI.Isend(b, comm; dest = rank, tag = 4)
+                        MPI.Waitall([rreq, sreq])
+                        @test w == v
+                        @test count(==(mpi_test_value(T, 0)), c) == length(c) - length(v)
+                    end
+
+                    # scatter into a strided view
+                    n = length(v_fast)
+                    src = rank == root ?
+                          MPI.VBuffer(FixedSizeVector{T,Mem{T}}(mpi_test_value.(T, 1:(nranks * n))),
+                                      fill(n, nranks)) : nothing
+                    c = copy(a)
+                    MPI.Scatterv!(src, view(c, 1, ntuple(Returns(:), N - 1)...), comm; root)
+                    @test vec(view(c, 1, ntuple(Returns(:), N - 1)...)) ==
+                          mpi_test_value.(T, (rank * n + 1):((rank + 1) * n))
+                    @test view(c, 2:size(c, 1), ntuple(Returns(:), N - 1)...) ==
+                          view(a, 2:size(a, 1), ntuple(Returns(:), N - 1)...)
+                end
+            end
+        end
+
+        @testset "conversion is delegated to other storage types" begin
+            a = FixedSizeArrays.wrap(FixedSizeArray, MPITestVector(collect(1.0:6.0)), (2, 3))
+            @test Base.cconvert(MPI.MPIPtr, a) === Base.cconvert(MPI.MPIPtr, parent(a).v)
+            b = FixedSizeArray{Float64}(undef, 2, 3)
+            rreq = MPI.Irecv!(b, comm; source = rank, tag = 5)
+            sreq = MPI.Isend(a, comm; dest = rank, tag = 5)
+            MPI.Waitall([rreq, sreq])
+            @test b == a
+        end
     end
 
     @testset "Constant-prop through iterate" begin
