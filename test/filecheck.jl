@@ -24,8 +24,10 @@ const fc_run_reshape_throw_checks = VERSION >= v"1.14-DEV"
 const fc_run_bounds_check_elision_checks = Base.JLOptions().check_bounds != 1
 # https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200: since Julia 1.13 (which
 # dropped `@inbounds` from the generic `fill!`) LLVM does not elide the bounds check in
-# `fill!` for `FixedSizeArray`s and their views, and so does not vectorize the loop.
-const fc_fill_bounds_check_skipped = VERSION >= v"1.13"
+# `fill!` for views of `FixedSizeArray`s, and so does not vectorize the loop.
+# `FixedSizeArray`s themselves have a `fill!` method of their own, which does not have
+# this problem.  (`v"1.13-"` to include the prereleases of v1.13.)
+const fc_fill_view_bounds_check_skipped = VERSION >= v"1.13-"
 
 # Before Julia 1.13 `copy` went through a loop with a bounds check and two allocations.
 const fc_run_copy_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.13"
@@ -314,15 +316,18 @@ build_is_production_build &&
 
     fc_run_bounds_check_elision_checks &&
     @testset "`fill!` elides the bounds check and vectorizes (issue #200)" begin
-        # Do not print the FileCheck diagnostic while the test is known to be broken.
-        dump_input = fc_fill_bounds_check_skipped ? "never" : "fail"
-        @testset "$(name)" for (name, A) in (("array", fc_fill_array), ("view", fc_fill_view))
+        @testset "$(name)" for (name, A, skipped) in (
+            ("array", fc_fill_array, false),
+            ("view", fc_fill_view, fc_fill_view_bounds_check_skipped),
+        )
+            # Do not print the FileCheck diagnostic while the test is known to be broken.
+            dump_input = skipped ? "never" : "fail"
             @test (@filecheck dump_input=dump_input begin
                 @check "define"
                 @check_not "{{boundserror|bounds_error}}"
                 @check "store <{{[0-9]+}} x double>"
                 code_llvm(fill!, (A, Float64); debuginfo=:none)
-            end) skip=fc_fill_bounds_check_skipped
+            end) skip=skipped
         end
     end
 end
