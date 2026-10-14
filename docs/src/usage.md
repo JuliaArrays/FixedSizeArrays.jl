@@ -77,6 +77,21 @@ To make it easier to refer to the concrete type `FixedSizeArray{T,N,Mem}` with t
 * [`FixedSizeVectorDefault{T}`](@ref);
 * [`FixedSizeMatrixDefault{T}`](@ref).
 
+### GPU memory backends
+
+The memory backend can also be a GPU vector (any `GPUArraysCore.AbstractGPUArray`, e.g. a `CuVector` from CUDA.jl), for example to give a fixed shape to a GPU vector with [`FixedSizeArrays.wrap`](@ref):
+
+```julia
+using CUDA, FixedSizeArrays
+a = FixedSizeArrays.wrap(FixedSizeArray, CUDA.zeros(Float32, 24), (2, 3, 4))
+a .= a .+ 1  # runs as a GPU kernel
+sum(a; dims = 2)  # a `FixedSizeArray` backed by a `CuVector`
+```
+
+With the package extension for [GPUArraysCore.jl](https://github.com/JuliaGPU/GPUArrays.jl), whole-array operations such as broadcasting, `fill!`, `copyto!`, `similar` and reductions are forwarded to the memory backend, so that they run on the GPU instead of falling back to scalar indexing.
+`Adapt.adapt` converts the memory backend of such an array and wraps the result again, so that it can be passed to GPU kernels (e.g. written with CUDA.jl or KernelAbstractions.jl), where it becomes a `FixedSizeArray` backed by a device array.
+Only for GPU memory backends, `adapt` keeps the `FixedSizeArray` wrapper: `adapt(Array, a)` returns a `FixedSizeArray` backed by a `Vector`, while for a `FixedSizeArray` with a CPU memory backend `adapt(CuArray, a)` returns a `CuArray`.
+
 ## The `collect_as` utility
 
 The [array literals syntax](https://docs.julialang.org/en/v1/manual/arrays/#man-array-literals) `[A, B, C, ...]` to construct arrays is limited to `Base`'s `Array` and cannot be extended to custom array types.

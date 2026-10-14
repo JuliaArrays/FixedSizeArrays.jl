@@ -5,6 +5,7 @@ using FixedSizeArrays: checked_dims, wrap
 using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
+using JLArrays: JLArrays, JLArray
 import Aqua
 
 # Check if the compilation options allow maximum performance.
@@ -89,6 +90,16 @@ Base.size(x::MPITestVector) = size(x.v)
 Base.getindex(x::MPITestVector, i::Int) = x.v[i]
 Base.setindex!(x::MPITestVector, y, i::Int) = (x.v[i] = y; x)
 Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, x.v)
+
+# helpers for the tests with a GPU memory backend
+
+const KA = JLArrays.KernelAbstractions
+using .KA: @kernel, @index
+
+@kernel function ka_square!(b, a)
+    i = @index(Global, Linear)
+    @inbounds b[i] = a[i]^2
+end
 
 @testset verbose=true "FixedSizeArrays" begin
     @testset "meta" begin
@@ -868,6 +879,140 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         farr = adapt(FixedSizeArray, arr)
         @test farr isa Transpose
         @test parent(farr) isa FixedSizeArray
+        # A `FixedSizeArray` with a CPU memory backend is converted as a whole
+        a = FixedSizeArray([1.0 2.0; 3.0 4.0])
+        @test adapt(Array, a) isa Matrix{Float64}
+        @test adapt(Array, a) == a
+        @test adapt(JLArray, a) isa JLArray{Float64, 2}
+        @test Array(adapt(JLArray, a)) == a
+    end
+
+    @testset "GPU memory backend (JLArrays)" begin
+        # JLArrays emulates a GPU array package on the CPU. Scalar indexing is disallowed,
+        # so any operation falling back to scalar indexing on the host throws.
+        JLArrays.allowscalar(false)
+        JLV{T} = JLArray{T, 1}
+        GFSA{T, N} = FixedSizeArray{T, N, JLV{T}}
+        gpu(a::AbstractArray) = wrap(FixedSizeArray, JLArray(vec(a)), size(a))
+        ref = reshape(collect(1.0:24.0), 2, 3, 4)
+        @test_throws ErrorException gpu(ref)[1]  # meta: scalar indexing is disallowed
+
+        @testset "broadcasting" begin
+            a = gpu(ref)
+            b = similar(a)
+            @test b isa GFSA{Float64, 3}
+            @test size(b) == size(a)
+            b .= 0
+            @test Array(b) == zeros(2, 3, 4)
+            b .= a .+ 1
+            @test Array(b) == ref .+ 1
+            b .= 2 .* a .- JLArray(ref)  # mixed with a plain GPU array
+            @test Array(b) == ref
+            c = a .+ b
+            @test c isa GFSA{Float64, 3}
+            @test Array(c) == 2 .* ref
+            for d ∈ (a .+ JLArray(ref), JLArray(ref) .+ a, a .* reshape(JLArray([1.0, 2.0]), 2, 1, 1))
+                @test d isa GFSA{Float64, 3}
+            end
+            @test Array(a .* reshape(JLArray([1.0, 2.0]), 2, 1, 1)) == ref .* [1.0, 2.0]
+            @test (a .> 12) isa GFSA{Bool, 3}
+            @test Array(map(x -> 2x, a)) == 2 .* ref
+            # broadcasting into a view of the last dimension
+            v = view(b, :, :, 2:3)
+            v .= 0
+            @test Array(b) == cat(ref[:, :, 1:1], zeros(2, 3, 2), ref[:, :, 4:4]; dims = 3)
+            # zero-dimensional
+            z = wrap(FixedSizeArray, JLArray([3.0]), ())
+            @test z .+ 1 === 4.0
+        end
+
+        @testset "`similar`, `copy`, `fill!` and `copyto!`" begin
+            a = gpu(ref)
+            for (s, T, sz) ∈ ((similar(a, Int), Int, (2, 3, 4)), (similar(a, Float32, (5,)), Float32, (5,)),
+                              (similar(a, (6, 4)), Float64, (6, 4)), (copy(a), Float64, (2, 3, 4)),
+                              (zero(a), Float64, (2, 3, 4)), (a[:], Float64, (24,)))
+                @test s isa GFSA{T, length(sz)}
+                @test size(s) == sz
+            end
+            @test parent(copy(a)) !== parent(a)
+            @test Array(a[:]) == vec(ref)
+            @test Array(zero(a)) == zeros(2, 3, 4)
+            b = similar(a)
+            @test fill!(b, 7) === b
+            @test Array(b) == fill(7.0, 2, 3, 4)
+            for src ∈ (a, JLArray(ref), ref)
+                fill!(b, 0)
+                @test copyto!(b, src) === b
+                @test Array(b) == ref
+                fill!(b, 0)
+                @test copyto!(b, 1, src, 1, 24) === b
+                @test Array(b) == ref
+            end
+            for dst ∈ (JLArray(zeros(2, 3, 4)), zeros(2, 3, 4))
+                @test copyto!(dst, a) === dst
+                @test Array(dst) == ref
+                fill!(dst, 0)
+                @test copyto!(dst, 1, a, 1, 24) === dst
+                @test Array(dst) == ref
+            end
+        end
+
+        @testset "`Array`, `collect`, `show`" begin
+            a = gpu(ref)
+            @test Array(a) isa Array{Float64, 3}
+            @test Array(a) == ref
+            @test collect(a) == ref
+            @test sprint(show, MIME"text/plain"(), a) ==
+                  replace(sprint(show, MIME"text/plain"(), ref), "Array{Float64, 3}" => string(typeof(a)))
+            @test sprint(show, gpu([1, 2, 3])) == "[1, 2, 3]"
+        end
+
+        @testset "reductions and comparisons" begin
+            a = gpu(ref)
+            @test sum(a) == sum(ref)
+            @test maximum(a) == 24
+            @test minimum(abs2, a) == 1
+            @test mapreduce(x -> 2x, +, a) == 2 * sum(ref)
+            @test mapreduce(x -> 2x, +, a; init = 1.0) == 2 * sum(ref) + 1
+            s = sum(a; dims = 2)
+            @test s isa GFSA{Float64, 3}
+            @test Array(s) == sum(ref; dims = 2)
+            @test any(>(23), a) && !any(>(24), a)
+            @test all(>(0), a) && !all(>(1), a)
+            @test any(a .> 23) && !all(a .> 1)
+            @test count(>(12), a) == 12
+            @test a == a
+            @test a == copy(a)
+            @test a != a .+ 1
+            @test a != gpu(ref[:, :, 1:3])
+            @test a == JLArray(ref) && JLArray(ref) == a
+            @test a ≈ a .+ 1e-14
+            @test !(a ≈ a .+ 1)
+            @test a ≈ JLArray(ref) && JLArray(ref) ≈ a
+        end
+
+        @testset "Adapt" begin
+            a = gpu(ref)
+            # the memory backend is adapted, and the array rewrapped
+            h = adapt(Array, a)
+            @test h isa FixedSizeArray{Float64, 3, Vector{Float64}}
+            @test h == ref
+            @test adapt(JLArray, a) isa GFSA{Float64, 3}
+            @test adapt(JLArray, a) == a
+            @test adapt(JLArray, h) isa JLArray{Float64, 3}  # CPU memory backend: converted as a whole
+            d = adapt(JLArrays.Adaptor(), a)  # conversion for kernels
+            @test d isa FixedSizeArray{Float64, 3, <:JLArrays.JLDeviceArray}
+            @test size(d) == size(a)
+        end
+
+        @testset "kernel" begin
+            a = gpu(ref)
+            b = similar(a)
+            @test KA.get_backend(a) isa JLArrays.JLBackend
+            # the arguments of a kernel are adapted with `JLArrays.Adaptor`
+            ka_square!(KA.get_backend(a))(b, a; ndrange = length(a))
+            @test Array(b) == ref .^ 2
+        end
     end
 
 

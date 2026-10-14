@@ -2,6 +2,17 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version [v1.5.0](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.5.0) - Unreleased
+
+### Added
+
+* Package extension with [`GPUArraysCore.jl`](https://github.com/JuliaGPU/GPUArrays.jl) (and `Adapt.jl`) for `FixedSizeArray`s whose memory backend is a GPU array, i.e. a `GPUArraysCore.AbstractGPUArray` such as a `CuVector` or a `JLVector` (e.g. constructed with `FixedSizeArrays.wrap`). Instead of falling back to scalar indexing, which is disallowed or very slow for GPU arrays, these operations are now forwarded to the memory backend: broadcasting (in place and out of place, also mixed with plain GPU arrays, with a GPU broadcast style wrapping the one of the memory backend, so that the result of out-of-place broadcasting is again a GPU-backed `FixedSizeArray`), `similar`, `fill!`, `copyto!` from and to plain GPU arrays, `collect`, `map`, `mapreduce` and the reductions based on it (e.g. `sum`, `maximum`, also with `dims`), `any`, `all`, `count`, `==`, `isapprox`, and `show`.
+* `Adapt.adapt` now adapts the memory backend of a GPU-backed `FixedSizeArray` and wraps the result again, so that GPU-backed `FixedSizeArray`s can be passed to GPU kernels (e.g. with CUDA.jl or KernelAbstractions.jl), where they become `FixedSizeArray`s backed by device arrays, and `adapt(Array, a)` copies `a` to a `FixedSizeArray` backed by a `Vector`. The behavior of `Adapt.adapt` for `FixedSizeArray`s with other memory backends is unchanged: e.g., `adapt(CuArray, a)` still converts a `FixedSizeArray` with a CPU memory backend to a `CuArray`.
+
+### Fixed
+
+* Improved performance of `fill!` on Julia v1.13 and later: `fill!(::FixedSizeArray, x)` now loops directly over the memory backend, which elides the bounds checks and vectorizes. ([#200](https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200))
+
 ## Version [v1.4.2](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.4.2) - 2026-10-13
 
 ### Added

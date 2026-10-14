@@ -9,6 +9,7 @@ Collects = "08986516-18db-4a8b-8eaa-f5ef1828d8f1"
 LightBoundsErrors = "e21c612c-4641-4669-b9c3-3f4360ced9da"
 
 [weakdeps]
+GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
@@ -17,11 +18,13 @@ MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 FixedSizeArraysRandomExt = "Random"
 FixedSizeArraysAdaptExt = "Adapt"
 FixedSizeArraysMPIExt = "MPI"
+FixedSizeArraysGPUArraysCoreExt = ["Adapt", "GPUArraysCore"]
 
 [compat]
 Adapt = "4"
 CheckedSizeProduct = "1"
 Collects = "1"
+GPUArraysCore = "0.2"
 LightBoundsErrors = "1"
 MPI = "0.20.28"
 Random = "1"
