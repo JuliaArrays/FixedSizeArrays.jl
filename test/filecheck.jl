@@ -30,6 +30,11 @@ const fc_fill_bounds_check_skipped = VERSION >= v"1.13"
 # Before Julia 1.13 `copy` went through a loop with a bounds check and two allocations.
 const fc_run_copy_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.13"
 
+# https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/201: the dimensions of an
+# argument must be loaded once, in the check of its size, and not again in the loops that
+# follow.  The LLVM names of the loads (`%"[2]_ptr`) match from Julia 1.12 on.
+const fc_run_size_reload_checks = VERSION >= v"1.12"
+
 # Constant folding of `length` through a `@noinline` call.
 @noinline fc_len(A::AbstractArray) = length(A)
 fc_len_fsv() = fc_len(FixedSizeVector{Float64}(undef, 3))
@@ -109,6 +114,21 @@ fc_length(A) = length(A)
 
 # `copy`.
 fc_copy(A) = copy(A)
+
+# Reduced version of the kernel in issue #201: a check of the size of the argument
+# followed by loops, one of which is conditionally executed, writing to `du`.  All three
+# ingredients are needed to reproduce the issue: with a plain loop nest, or without the
+# stores, or with two dimensions only, the IR is the same with lazy and eager `size`.
+@noinline fc_201_throw_dm(ax) = throw(DimensionMismatch("unexpected axes $(ax)"))
+function fc_201_kernel!(du, nelem)
+    axes(du) == (Base.OneTo(5), Base.OneTo(4), Base.OneTo(nelem)) || fc_201_throw_dm(axes(du))
+    for e in 1:nelem, i in 1:4
+        for ii in (i + 1):4, v in 1:5
+            @inbounds du[v, ii, e] += 1.0
+        end
+    end
+    return nothing
+end
 
 # The IR of a build instrumented for code coverage is not representative.
 build_is_production_build &&
@@ -248,6 +268,23 @@ build_is_production_build &&
             @check_not "{{ br | call }}"
             @check "ret $fc_int"
             code_llvm(fc_length, (FixedSizeMatrixDefault{Float64},); debuginfo=:none)
+        end
+    end
+
+    fc_run_size_reload_checks &&
+    @testset "dimensions are not reloaded after a check of the size (issue #201)" begin
+        # With `size` loading each dimension lazily, the second dimension of `du` was
+        # reloaded in the loop and used as a dynamic stride.  The only load of the second
+        # dimension must be the one in the size check, and the strides must all be
+        # constants: no multiplication by a non-constant value.
+        @test @filecheck begin
+            @check "define"
+            @check_not "mul $fc_int %{{[^,]+}}, %"
+            @check "load $fc_int, ptr %\"[2]_ptr"
+            @check_not "load $fc_int, ptr %\"[2]_ptr"
+            @check_not "mul $fc_int %{{[^,]+}}, %"
+            @check "ret void"
+            code_llvm(fc_201_kernel!, (FixedSizeArrayDefault{Float64, 3}, Int); debuginfo=:none)
         end
     end
 
