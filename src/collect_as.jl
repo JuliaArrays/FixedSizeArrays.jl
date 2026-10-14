@@ -42,8 +42,8 @@ function (collect::Collect)(::Type{FSA}, iterator) where {FSA<:FixedSizeArray}
     end
     mem = parent_type_with_default(T)
     shape = inferred_shape(T, iterator)
-    backing = collect(mem, iterator)
-    fsv = new_fixed_size_array(backing, (length(backing),))
+    backing = collect_storage(collect, mem, iterator)
+    fsv = new_fixed_size_array(backing, (storage_length(backing),))
     reshape(fsv, shape)
 end
 

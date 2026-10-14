@@ -10,6 +10,10 @@ export
 
 Construct a fixed-size `FixedSizeArray` with element type `T`, number of dimensions `N`, and memory backend `Mem`.
 
+The memory backend `Mem` is a `DenseVector{T}` (e.g. `Memory{T}` or `Vector{T}`) of length
+`prod(size)`, or, on Julia v1.11 and later, a `GenericMemoryRef{kind,T}` (e.g. `MemoryRef{T}`)
+to the first element of the array, with at least `prod(size)` elements from it on in its memory.
+
 Convenient aliases provided:
 
 * [`FixedSizeVector{T,Mem}`](@ref): for 1-dimensional fixed-size arrays
@@ -18,10 +22,10 @@ Convenient aliases provided:
 * [`FixedSizeVectorDefault{T}`](@ref): for 1-dimensional fixed-size arrays, with default memory backend
 * [`FixedSizeMatrixDefault{T}`](@ref): for 2-dimensional fixed-size arrays, with default memory backend
 """
-struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
+struct FixedSizeArray{T,N,Mem<:StorageBound{T}} <: DenseArray{T,N}
     mem::Mem
     size::NTuple{N,Int}
-    global function new_fixed_size_array(mem::DenseVector{T}, size::NTuple{N,Int}) where {T,N}
+    global function new_fixed_size_array(mem::StorageBound{T}, size::NTuple{N,Int}) where {T,N}
         new{T,N,typeof(mem)}(mem, size)
     end
 end
@@ -43,7 +47,7 @@ const FixedSizeArrayAllowedConstructorType = let
             Type{FixedSizeArray{T, N, Mem{T}} where {T}} where {N},
         }
     end
-    special_storage_types = (Vector, optional_memory...)
+    special_storage_types = (Vector, optional_memory..., optional_memory_ref...)
     Union{
         # 0 fixed parameters
         Type{FixedSizeArray},
@@ -52,9 +56,9 @@ const FixedSizeArrayAllowedConstructorType = let
         Type{FixedSizeArray{T, N} where {T}} where {N},
         # 2 fixed parameters
         Type{FixedSizeArray{T, N}} where {T, N},
-        Type{FixedSizeArray{T, N, Mem} where {N}} where {T, Mem <: DenseVector{T}},
+        Type{FixedSizeArray{T, N, Mem} where {N}} where {T, Mem <: StorageBound{T}},
         # 3 fixed parameters
-        Type{FixedSizeArray{T, N, Mem}} where {T, N, Mem <: DenseVector{T}},
+        Type{FixedSizeArray{T, N, Mem}} where {T, N, Mem <: StorageBound{T}},
         # special cases depending on the underlying storage type
         map(f, special_storage_types)...,
     }
@@ -93,7 +97,7 @@ Convenient aliases provided:
 """
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
-function parent_type_with_default(::Type{<:(FixedSizeArray{T, N, Mem} where {N})}) where {T, Mem <: DenseVector{T}}
+function parent_type_with_default(::Type{<:(FixedSizeArray{T, N, Mem} where {N})}) where {T, Mem <: StorageBound{T}}
     Mem
 end
 function parent_type_with_default(::Type{<:FixedSizeArray{T}}) where {T}
@@ -102,7 +106,7 @@ end
 function parent_type_with_default(::Type{<:FixedSizeArray})
     default_underlying_storage_type
 end
-for Mem ∈ (Vector, optional_memory...)
+for Mem ∈ (Vector, optional_memory..., optional_memory_ref...)
     FSA = FixedSizeArray{T, N, Mem{T}} where {T, N}
     t_fsa = Union{
         Type{FSA},
@@ -131,7 +135,7 @@ function undef_constructor(::Type{FSA}, size::Tuple{Vararg{Integer}}) where {T, 
     s = map(Int, size)
     Mem = parent_type_with_default(FSA)
     len = checked_dims(s)
-    mem = Mem(undef, len)
+    mem = new_storage(Mem, len)
     new_fixed_size_array(mem, s)
 end
 
@@ -164,13 +168,28 @@ end
 Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
 Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray, i::Int)
     @boundscheck checkbounds(A, i)
-    @inbounds parent(A)[i]
+    @inbounds storage_getindex(parent(A), i)
 end
 Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray, x, i::Int)
     @boundscheck checkbounds(A, i)
-    @inbounds parent(A)[i] = x
+    @inbounds storage_setindex!(parent(A), x, i)
     return A
 end
+
+# Access to the memory backend. The bounds are checked by the `FixedSizeArray`, these
+# methods are always called in an `@inbounds` context. Methods for `GenericMemoryRef` are
+# in `memoryref.jl`.
+Base.@propagate_inbounds storage_getindex(m, i::Int) = m[i]
+Base.@propagate_inbounds function storage_setindex!(m, x, i::Int)
+    m[i] = x
+    nothing
+end
+Base.@propagate_inbounds storage_isassigned(m, i::Int) = isassigned(m, i)
+new_storage(::Type{Mem}, len::Int) where {Mem} = Mem(undef, len)
+copy_storage(m, ::Int) = copy(m)
+collect_storage(collect, ::Type{Mem}, iterator) where {Mem} = collect(Mem, iterator)
+storage_elsize(::Type{Mem}) where {Mem} = Base.elsize(Mem)
+storage_length(m) = length(m)
 
 function Base.checkbounds(A::FixedSizeArray, is...)
     checkbounds_lightboundserror(A, is...)
@@ -196,7 +215,7 @@ end
 
 function Base.isassigned(a::FixedSizeArray, i::Int)
     @boundscheck checkbounds(Bool, a, i) || return false
-    @inbounds isassigned(parent(a), i)
+    @inbounds storage_isassigned(parent(a), i)
 end
 
 # safe product of a tuple of integers, for calculating dimensions size
@@ -221,7 +240,7 @@ end
 
 # broadcasting
 
-struct FixedSizeArrayBroadcastStyle{N, Mem <: DenseVector} <: Broadcast.AbstractArrayStyle{N} end
+struct FixedSizeArrayBroadcastStyle{N, Mem <: StorageBoundAny} <: Broadcast.AbstractArrayStyle{N} end
 
 function (::Type{<:(FixedSizeArrayBroadcastStyle{N, Mem} where {N})})(::Val{M}) where {Mem, M}
     m = check_count_value(M)
@@ -319,15 +338,28 @@ parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,Mem}}) where {Mem} = Mem
 """
     parent(f::FixedSizeArray)
 
-Return the underlying parent object of the fixed-size array `f`.
+Return the underlying parent object of the fixed-size array `f`, i.e. its memory backend.
 Use `parentindices(f)` to get the valid indices of the parent of `f`.
+
+For a `GenericMemoryRef` backend this is the memory reference to the first element of `f`
+(which is not an `AbstractArray`), and `parentindices(f)` are the indices
+`(Base.OneTo(length(f)),)` relative to it.
 """
 Base.parent(f::FixedSizeArray) = getfield(f, :mem)
 
-Base.parentindices(f::FixedSizeArray) = axes(parent(f))
+Base.parentindices(f::FixedSizeArray) = storage_parentindices(parent(f), f)
+storage_parentindices(m, ::FixedSizeArray) = axes(m)
 
+"""
+    underlying_storage(f)
+
+The memory backend of `f` as an `AbstractVector` of length `length(f)`, sharing the
+elements of `f`: `parent(f)` for a `DenseVector` backend, a view of the memory for a
+`GenericMemoryRef` backend.
+"""
 underlying_storage(m) = m
-underlying_storage(f::FixedSizeArray) = parent(f)
+underlying_storage(f::FixedSizeArray) = storage_vector(parent(f), length(f))
+storage_vector(m, ::Int) = m
 
 axes_are_one_based(axes) = all(isone ∘ first, axes)
 
@@ -355,7 +387,7 @@ end
 # `copy`: avoid the `similar` and `copyto!` in the generic fallback
 
 function Base.copy(a::FixedSizeArray)
-    new_fixed_size_array(copy(Base.parent(a)), size(a))
+    new_fixed_size_array(copy_storage(Base.parent(a), length(a)), size(a))
 end
 
 # `getindex` with a `Colon` for the index: better effects than with the generic fallback
@@ -372,14 +404,25 @@ end
 # `copyto!`
 
 Base.@propagate_inbounds function copyto5!(dst, doff, src, soff, n)
-    copyto!(underlying_storage(dst), doff, underlying_storage(src), soff, n)
+    if use_memoryref_copy(dst, src)
+        copyto_memoryref!(dst, Int(doff), src, Int(soff), Int(n))
+    else
+        copyto!(underlying_storage(dst), doff, underlying_storage(src), soff, n)
+    end
     dst
 end
 
 Base.@propagate_inbounds function copyto2!(dst, src)
-    copyto!(underlying_storage(dst), underlying_storage(src))
+    if use_memoryref_copy(dst, src)
+        copyto_memoryref!(dst, 1, src, 1, length(src))
+    else
+        copyto!(underlying_storage(dst), underlying_storage(src))
+    end
     dst
 end
+
+# whether to copy directly between memory references, see `memoryref.jl`
+use_memoryref_copy(dst, src) = false
 
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
 Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::FixedSizeArray) = copyto2!(dst, src)
@@ -411,7 +454,7 @@ end
 
 # `elsize`: part of the strided arrays interface, used for `pointer`
 
-Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
+Base.elsize(::Type{A}) where {A<:FixedSizeArray} = storage_elsize(parent_type(A))
 
 # `reshape`: specializing it to ensure it returns a `FixedSizeArray`
 
@@ -446,6 +489,43 @@ result is in use is not allowed: wrap `parent` again after resizing it instead.
 This is similar to the (non-public) `Base.wrap(Array, mem, dims)` in Julia v1.11+,
 except that `parent` must have exactly the length of the result.
 
+---
+
+    FixedSizeArrays.wrap(FixedSizeArray, ref::GenericMemoryRef, size::NTuple{N,Integer})
+    FixedSizeArrays.wrap(FixedSizeArray, ref::GenericMemoryRef, size1::Integer, size2::Integer, ...)
+    FixedSizeArrays.wrap(FixedSizeArray{T,N,MemoryRef{T}} where {T,N}, parent::Vector, size...)
+
+Julia v1.11 and later: return a [`FixedSizeArray`](@ref) of the given `size` with a
+`GenericMemoryRef` memory backend, whose elements are the `prod(size)` elements of the memory
+of `ref` starting at `ref`. The memory must have at least that many elements from `ref` on,
+otherwise a `DimensionMismatch` is thrown. `parent` of the result is `ref`.
+
+With a `Vector` and a `FixedSizeArray` type with a `GenericMemoryRef` backend as the first
+argument, the current reference to the first element of the `Vector` is wrapped. As for other
+parents, the length of the `Vector` must be equal to `prod(size)`.
+
+Unlike a `Vector` backend, the memory reference is an immutable field of the result, so the
+pointer to the data does not need to be reloaded after writes to other arrays (e.g. in loops).
+The result keeps the memory alive and stays valid when the `Vector` is resized, but it then
+keeps referring to the memory the `Vector` had when it was wrapped: after `resize!` (or
+`push!`, `popfirst!`, `sizehint!`, ...) of the `Vector` the result may no longer share its
+elements with the `Vector`, and elements dropped by the `Vector` may be overwritten or
+unassigned. Wrap the `Vector` again after resizing it.
+
+```julia-repl
+julia> v = collect(1:8); popfirst!(v);
+
+julia> a = FixedSizeArrays.wrap(FixedSizeArray, v.ref, (2, 3));
+
+julia> a, parent(a) === v.ref
+([2 4 6; 3 5 7], true)
+
+julia> b = FixedSizeArrays.wrap(FixedSizeArray{T,N,MemoryRef{T}} where {T,N}, v);
+
+julia> typeof(b)
+FixedSizeVector{Int64, MemoryRef{Int64}}
+```
+
 # Examples
 
 ```jldoctest
@@ -478,12 +558,13 @@ function wrap(::Type{FSA}, parent::DenseVector, size::Tuple{Vararg{Integer}}) wh
     if length(parent) != len
         throw(DimensionMismatch(lazy"length of the parent ($(length(parent))) does not match the product of the dimensions $s"))
     end
-    a = new_fixed_size_array(parent, s)
+    a = new_fixed_size_array(wrap_backend(FSA, parent), s)
     if !(a isa FSA)
         throw(ArgumentError(lazy"a `FixedSizeArray` wrapping a `$(typeof(parent))` with $(length(s)) dimensions is not a `$FSA`"))
     end
     a
 end
+wrap_backend(::Type{<:FixedSizeArray}, parent) = parent
 function wrap(::Type{FSA}, parent::DenseVector, size1::Integer, size::Vararg{Integer}) where {FSA <: FixedSizeArray}
     wrap(FSA, parent, (size1, size...))
 end

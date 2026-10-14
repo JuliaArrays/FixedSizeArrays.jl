@@ -2,6 +2,12 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version [v1.5.0](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.5.0) - Unreleased
+
+### Added
+
+* On Julia v1.11 and later, the memory backend of a `FixedSizeArray` can be a `GenericMemoryRef` (e.g. `FixedSizeArray{T,N,MemoryRef{T}}`), a reference to an element in a `Memory`, which can be at an offset and does not need to have exactly the length of the array. `FixedSizeArrays.wrap(FixedSizeArray, ref, size)` wraps a reference, `FixedSizeArrays.wrap(FixedSizeArray{T,N,MemoryRef{T}} where {T,N}, v::Vector, size)` the reference of a `Vector`. Unlike a `Vector` backend, the data pointer is a field of the immutable `FixedSizeArray` and need not be reloaded from a mutable object at every access.
+
 ## Version [v1.4.2](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.4.2) - 2026-10-13
 
 ### Added
