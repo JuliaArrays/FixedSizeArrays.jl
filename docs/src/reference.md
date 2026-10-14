@@ -15,6 +15,7 @@ FixedSizeVectorDefault
 FixedSizeMatrixDefault
 Base.parent
 FixedSizeArrays.wrap
+FixedSizeArrays.StaticSizeArray
 ```
 
 ## Internal API
@@ -28,4 +29,6 @@ This section gathers documentation of internal functionalities of `FixedSizeArra
 ```@docs
 FixedSizeArrays.with_stripped_type_parameters
 FixedSizeArrays.with_stripped_type_parameters_unchecked
+FixedSizeArrays.static_dims
+FixedSizeArrays.static_strides
 ```

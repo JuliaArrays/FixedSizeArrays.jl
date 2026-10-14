@@ -26,9 +26,13 @@ struct FixedSizeArray{T,N,Mem<:DenseVector{T}} <: DenseArray{T,N}
     end
 end
 
+# The methods which only depend on the memory backend are shared with `StaticSizeArray`s:
+# both are always backed by the whole of their parent `DenseVector`.
+const FixedOrStaticSizeArray{T} = Union{FixedSizeArray{T}, StaticSizeArray{T}}
+
 function Base.propertynames(
     # the `unused` is here because of https://github.com/JuliaLang/julia/issues/44428
-    (@nospecialize unused::FixedSizeArray),
+    (@nospecialize unused::FixedOrStaticSizeArray),
     ::Bool = false,
 )
     ()
@@ -161,18 +165,18 @@ macro assume_noub_if_noinbounds(x)
     end
 end
 
-Base.IndexStyle(::Type{<:FixedSizeArray}) = IndexLinear()
-Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray, i::Int)
+Base.IndexStyle(::Type{<:FixedOrStaticSizeArray}) = IndexLinear()
+Base.@propagate_inbounds function Base.getindex(A::FixedOrStaticSizeArray, i::Int)
     @boundscheck checkbounds(A, i)
     @inbounds parent(A)[i]
 end
-Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray, x, i::Int)
+Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedOrStaticSizeArray, x, i::Int)
     @boundscheck checkbounds(A, i)
     @inbounds parent(A)[i] = x
     return A
 end
 
-function Base.checkbounds(A::FixedSizeArray, is...)
+function Base.checkbounds(A::FixedOrStaticSizeArray, is...)
     checkbounds_lightboundserror(A, is...)
 end
 
@@ -194,7 +198,7 @@ function Base.similar(::T, ::Type{E}, size::NTuple{N,Int}) where {T<:FixedSizeAr
     S(undef, size)
 end
 
-function Base.isassigned(a::FixedSizeArray, i::Int)
+function Base.isassigned(a::FixedOrStaticSizeArray, i::Int)
     @boundscheck checkbounds(Bool, a, i) || return false
     @inbounds isassigned(parent(a), i)
 end
@@ -230,6 +234,10 @@ end
 
 function Base.BroadcastStyle(::Union{Type{<:(FixedSizeArray{T, N, Mem} where {T})},
                                      Type{<:(SubArray{T, N, FixedSizeArray{T, N, Mem}} where {T})}}) where {N, Mem}
+    fixed_size_array_broadcast_style(Val(N), Mem)
+end
+
+function fixed_size_array_broadcast_style(::Val{N}, ::Type{Mem}) where {N, Mem}
     n = check_count_value(N)
     spec = TypeParametersElementType()
     mem = val_parameter(with_stripped_type_parameters(spec, Mem))
@@ -317,17 +325,17 @@ end
 parent_type(::Type{<:FixedSizeArray{<:Any,<:Any,Mem}}) where {Mem} = Mem
 
 """
-    parent(f::FixedSizeArray)
+    parent(f::Union{FixedSizeArray, StaticSizeArray})
 
-Return the underlying parent object of the fixed-size array `f`.
-Use `parentindices(f)` to get the valid indices of the parent of `f`.
+Return the underlying parent object of the fixed-size array `f`, a `DenseVector` of length
+`length(f)`. Use `parentindices(f)` to get the valid indices of the parent of `f`.
 """
-Base.parent(f::FixedSizeArray) = getfield(f, :mem)
+Base.parent(f::FixedOrStaticSizeArray) = getfield(f, :mem)
 
-Base.parentindices(f::FixedSizeArray) = axes(parent(f))
+Base.parentindices(f::FixedOrStaticSizeArray) = axes(parent(f))
 
 underlying_storage(m) = m
-underlying_storage(f::FixedSizeArray) = parent(f)
+underlying_storage(f::FixedOrStaticSizeArray) = parent(f)
 
 axes_are_one_based(axes) = all(isone ∘ first, axes)
 
@@ -381,16 +389,16 @@ Base.@propagate_inbounds function copyto2!(dst, src)
     dst
 end
 
-Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
-Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::FixedSizeArray) = copyto2!(dst, src)
+Base.@propagate_inbounds Base.copyto!(dst::FixedOrStaticSizeArray, doff::Integer, src::FixedOrStaticSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
+Base.@propagate_inbounds Base.copyto!(dst::FixedOrStaticSizeArray, src::FixedOrStaticSizeArray) = copyto2!(dst, src)
 
 for A ∈ (Array, optional_generic_memory...)  # Add more? Too bad we have to hardcode to avoid ambiguity.
     @eval begin
-        Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, doff::Integer, src::$A,             soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
-        Base.@propagate_inbounds Base.copyto!(dst::$A,             doff::Integer, src::FixedSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
+        Base.@propagate_inbounds Base.copyto!(dst::FixedOrStaticSizeArray, doff::Integer, src::$A,                      soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
+        Base.@propagate_inbounds Base.copyto!(dst::$A,                      doff::Integer, src::FixedOrStaticSizeArray, soff::Integer, n::Integer) = copyto5!(dst, doff, src, soff, n)
 
-        Base.@propagate_inbounds Base.copyto!(dst::FixedSizeArray, src::$A            ) = copyto2!(dst, src)
-        Base.@propagate_inbounds Base.copyto!(dst::$A,             src::FixedSizeArray) = copyto2!(dst, src)
+        Base.@propagate_inbounds Base.copyto!(dst::FixedOrStaticSizeArray, src::$A                     ) = copyto2!(dst, src)
+        Base.@propagate_inbounds Base.copyto!(dst::$A,                      src::FixedOrStaticSizeArray) = copyto2!(dst, src)
     end
 end
 
@@ -399,7 +407,7 @@ end
 # vectorize: <https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200>.
 # Forwarding to `fill!` of the parent instead is slower for short arrays on these versions.
 
-function Base.fill!(a::FixedSizeArray{T}, x) where {T}
+function Base.fill!(a::FixedOrStaticSizeArray{T}, x) where {T}
     xT = x isa T ? x : convert(T, x)::T
     mem = parent(a)
     for i ∈ eachindex(mem)
@@ -417,19 +425,19 @@ end
 
 # unsafe: the native address of the array's storage
 
-Base.cconvert(::Type{<:Ptr}, a::FixedSizeArray) = parent(a)
+Base.cconvert(::Type{<:Ptr}, a::FixedOrStaticSizeArray) = parent(a)
 
-function Base.unsafe_convert(::Type{Ptr{T}}, a::FixedSizeArray{T}) where {T}
+function Base.unsafe_convert(::Type{Ptr{T}}, a::FixedOrStaticSizeArray{T}) where {T}
     Base.unsafe_convert(Ptr{T}, parent(a))
 end
 
 # `elsize`: part of the strided arrays interface, used for `pointer`
 
-Base.elsize(::Type{A}) where {A<:FixedSizeArray} = Base.elsize(parent_type(A))
+Base.elsize(::Type{A}) where {A<:FixedOrStaticSizeArray} = Base.elsize(parent_type(A))
 
 # `reshape`: specializing it to ensure it returns a `FixedSizeArray`
 
-function Base.reshape(a::FixedSizeArray, size::(NTuple{N,Int} where {N}))
+function Base.reshape(a::FixedOrStaticSizeArray, size::(NTuple{N,Int} where {N}))
     len = checked_dims(size)
     if length(a) != len
         throw(DimensionMismatch("new shape not consistent with existing array length"))
@@ -507,7 +515,7 @@ end
 
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods (copied from `Base.Array`)
 
-Base.iterate(A::FixedSizeArray, i=1) = (@inline; (i - 1)%UInt < length(A)%UInt ? (@inbounds A[i], i + 1) : nothing)
+Base.iterate(A::FixedOrStaticSizeArray, i=1) = (@inline; (i - 1)%UInt < length(A)%UInt ? (@inbounds A[i], i + 1) : nothing)
 
 # destructuring interface: `Base.rest`: add a method of our own, improving performance
 
