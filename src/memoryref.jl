@@ -14,10 +14,10 @@
 # pointer is loop invariant, and the `Memory` it points into stays alive (rooted) while
 # the `FixedSizeArray` is.
 
-@static if isdefined(Core, :memoryrefnew)
-    const memoryrefnew = Core.memoryrefnew
+const memoryrefnew = @static if isdefined(Core, :memoryrefnew)
+    Core.memoryrefnew
 else
-    const memoryrefnew = Core.memoryref
+    Core.memoryref
 end
 
 const MemRef{T} = GenericMemoryRef{K, T, AS} where {K, AS}
