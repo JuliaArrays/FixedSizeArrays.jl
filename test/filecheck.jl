@@ -548,7 +548,7 @@ build_is_production_build &&
             dump_input = skipped ? "never" : "fail"
             @test (@filecheck dump_input=dump_input begin
                 @check "define"
-                @check_not "{{boundserror|bounds_error}}"
+                @check_not fc_bounds_error
                 @check "store <{{[0-9]+}} x double>"
                 code_llvm(fill!, (A, Float64); debuginfo=:none)
             end) skip=skipped
