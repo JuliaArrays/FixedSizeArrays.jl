@@ -120,6 +120,9 @@ fc_constant_dims() = FixedSizeMatrixDefault{Float64}(undef, 3, 4)
 fc_size(A) = size(A)
 fc_length(A) = length(A)
 
+# `size` in a static dimension of an argument.
+fc_static_size(A) = size(A, 2) * 3
+
 # `copy`.
 fc_copy(A) = copy(A)
 
@@ -276,6 +279,17 @@ build_is_production_build &&
             @check_not "{{ br | call }}"
             @check "ret $fc_int"
             code_llvm(fc_length, (FixedSizeMatrixDefault{Float64},); debuginfo=:none)
+        end
+    end
+
+    @testset "`size` in a static dimension is constant-folded" begin
+        # The whole function body is a single `ret` of a literal: the size is not loaded.
+        @test @filecheck begin
+            @check "define"
+            @check_next "top:"
+            @check_next "ret $fc_int 12"
+            @check_next "}"
+            code_llvm(fc_static_size, (fc_static_dims_array,); debuginfo=:none)
         end
     end
 
