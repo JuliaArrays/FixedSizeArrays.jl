@@ -5,6 +5,9 @@
 using FileCheck
 using InteractiveUtils: code_llvm
 
+# Print the LLVM IR of `f` for the argument types `types`, for `@filecheck`.
+fc_llvm(f, types) = code_llvm(f, types; debuginfo=:none)
+
 # FileCheck regex matching any runtime heap-allocation entry point, across Julia versions.
 const fc_alloc_call = "{{(i?jl_gc_(small|pool|big)_alloc|i?jl_alloc_(genericmemory|array))}}"
 # `Int` is `i32` on 32-bit platforms.
@@ -29,6 +32,9 @@ const fc_run_reshape_throw_checks = VERSION >= v"1.14-DEV"
 
 # Bounds checks can be elided only when bounds checking is not forced on.
 const fc_run_bounds_check_elision_checks = Base.JLOptions().check_bounds != 1
+# On Julia 1.10 the call throwing the bounds error goes through an anonymous pointer, so it
+# cannot be matched by name.
+const fc_run_bounds_error_name_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.11"
 # https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200: since Julia 1.13 (which
 # dropped `@inbounds` from the generic `fill!`) LLVM does not elide the bounds check in
 # `fill!` for views of `FixedSizeArray`s, and so does not vectorize the loop.
@@ -237,7 +243,7 @@ build_is_production_build &&
             @check_next "top:"
             @check_next "ret $fc_int 3"
             @check_next "}"
-            code_llvm(fc_len_fsv, (); debuginfo=:none)
+            fc_llvm(fc_len_fsv, ())
         end
     end
 
@@ -245,7 +251,7 @@ build_is_production_build &&
         @test @filecheck begin
             @check "define"
             @check "ret $fc_int 8"
-            code_llvm(fc_rand_len, (); debuginfo=:none)
+            fc_llvm(fc_rand_len, ())
         end
     end
 
@@ -254,7 +260,7 @@ build_is_production_build &&
             @check "define"
             @check_not fc_alloc_call
             @check "ret void"
-            code_llvm(fc_empty, (); debuginfo=:none)
+            fc_llvm(fc_empty, ())
         end
     end
 
@@ -269,7 +275,7 @@ build_is_production_build &&
                 @check "= alloca"
                 @check_not fc_alloc_call
                 @check "ret $fc_int 8"
-                code_llvm(fc_rand_len, (); debuginfo=:none)
+                fc_llvm(fc_rand_len, ())
             end
         end
 
@@ -282,7 +288,7 @@ build_is_production_build &&
                 @check_not fc_alloc_call
                 @check "fadd double"
                 @check "ret double"
-                code_llvm(fc_rand_sum, (); debuginfo=:none)
+                fc_llvm(fc_rand_sum, ())
             end
         end
 
@@ -294,7 +300,7 @@ build_is_production_build &&
                 @check "= alloca"
                 @check_not fc_alloc_call
                 @check "ret double"
-                code_llvm(fc_rand_foldl, (); debuginfo=:none)
+                fc_llvm(fc_rand_foldl, ())
             end
         end
 
@@ -306,7 +312,7 @@ build_is_production_build &&
                 @check "= alloca"
                 @check_not fc_alloc_call
                 @check "ret float"
-                code_llvm(fc_fill_reduce_fsv, (Int, Int); debuginfo=:none)
+                fc_llvm(fc_fill_reduce_fsv, (Int, Int))
             end
         end
 
@@ -317,7 +323,7 @@ build_is_production_build &&
                 @check_not "gcframe"
                 @check_not fc_alloc_call
                 @check "ret $fc_int %\"n::Int$(Sys.WORD_SIZE)\""
-                code_llvm(fc_dynamic_len, (Int,); debuginfo=:none)
+                fc_llvm(fc_dynamic_len, (Int,))
             end
         end
 
@@ -328,7 +334,7 @@ build_is_production_build &&
                 @check_not "gcframe"
                 @check_not fc_alloc_call
                 @check "ret double"
-                code_llvm(fc_fill_reduce_2d, (Float64, Int, Int); debuginfo=:none)
+                fc_llvm(fc_fill_reduce_2d, (Float64, Int, Int))
             end
         end
 
@@ -342,13 +348,13 @@ build_is_production_build &&
                 @check "store $fc_int 3"
                 @check_not fc_alloc_call
                 @check "ret void"
-                code_llvm(fc_splat, (); debuginfo=:none)
+                fc_llvm(fc_splat, ())
             end
             @test @filecheck begin
                 @check "define"
                 @check_not "{{gcframe| call }}"
                 @check "ret double"
-                code_llvm(fc_destructure, (Float64,); debuginfo=:none)
+                fc_llvm(fc_destructure, (Float64,))
             end
         end
 
@@ -359,7 +365,7 @@ build_is_production_build &&
                     @check_not "{{ call |gcframe| br }}"
                     @check "ret $fc_int $result"
                     @check_next "}"
-                    code_llvm(f, (); debuginfo=:none)
+                    fc_llvm(f, ())
                 end
             end
         end
@@ -373,14 +379,14 @@ build_is_production_build &&
             @check "llvm.trap"
             @check_next "unreachable"
             @check_next "}"
-            code_llvm(fc_reshape_3, (); debuginfo=:none)
+            fc_llvm(fc_reshape_3, ())
         end
         # With a compatible size the function returns normally.
         @test @filecheck begin
             @check "define"
             @check_not "llvm.trap"
             @check "ret void"
-            code_llvm(fc_reshape_4, (); debuginfo=:none)
+            fc_llvm(fc_reshape_4, ())
         end
     end
 
@@ -389,7 +395,7 @@ build_is_production_build &&
             @check "define"
             @check_not "{{throw|argument_error|unreachable}}"
             @check "ret void"
-            code_llvm(fc_constant_dims, (); debuginfo=:none)
+            fc_llvm(fc_constant_dims, ())
         end
     end
 
@@ -400,14 +406,14 @@ build_is_production_build &&
             @check_next "top:"
             @check_not "{{ br | call }}"
             @check "ret void"
-            code_llvm(fc_size, (FixedSizeMatrixDefault{Float64},); debuginfo=:none)
+            fc_llvm(fc_size, (FixedSizeMatrixDefault{Float64},))
         end
         @test @filecheck begin
             @check "define"
             @check_next "top:"
             @check_not "{{ br | call }}"
             @check "ret $fc_int"
-            code_llvm(fc_length, (FixedSizeMatrixDefault{Float64},); debuginfo=:none)
+            fc_llvm(fc_length, (FixedSizeMatrixDefault{Float64},))
         end
     end
 
@@ -418,7 +424,7 @@ build_is_production_build &&
             @check_next "top:"
             @check_next "ret $fc_int 12"
             @check_next "}"
-            code_llvm(fc_static_size, (fc_static_dims_array,); debuginfo=:none)
+            fc_llvm(fc_static_size, (fc_static_dims_array,))
         end
     end
 
@@ -435,55 +441,41 @@ build_is_production_build &&
             @check_not "load $fc_int, ptr %\"[2]_ptr"
             @check_not "mul $fc_int %{{[^,]+}}, %"
             @check "ret void"
-            code_llvm(fc_201_kernel!, (FixedSizeArrayDefault{Float64, 3}, Int); debuginfo=:none)
+            fc_llvm(fc_201_kernel!, (FixedSizeArrayDefault{Float64, 3}, Int))
         end
     end
 
-    # On Julia 1.10 the call throwing the bounds error goes through an anonymous pointer, so
-    # it cannot be matched by name.
-    fc_run_bounds_check_elision_checks && VERSION >= v"1.11" &&
-    @testset "scalar indexing performs exactly one bounds check" begin
+    fc_run_bounds_error_name_checks &&
+    @testset "indexing performs exactly one bounds check" begin
         # The `@inbounds` access to the parent must not add a second check.
-        @testset "`getindex`" begin
+        @testset "$(name)" for (name, f, types) in (
+            ("`getindex`", fc_getindex, (FixedSizeVectorDefault{Float64}, Int)),
+            ("`setindex!`", fc_setindex!, (FixedSizeVectorDefault{Float64}, Int, Float64)),
+            ("Cartesian `getindex` with static dimensions", fc_getindex, (fc_static_dims_array, Int, Int, Int)),
+        )
             @test @filecheck begin
                 @check "define"
                 @check_count 1 fc_bounds_error
                 @check_not fc_bounds_error
-                code_llvm(fc_getindex, (FixedSizeVectorDefault{Float64}, Int); debuginfo=:none)
-            end
-        end
-        @testset "`setindex!`" begin
-            @test @filecheck begin
-                @check "define"
-                @check_count 1 fc_bounds_error
-                @check_not fc_bounds_error
-                code_llvm(fc_setindex!, (FixedSizeVectorDefault{Float64}, Int, Float64); debuginfo=:none)
+                fc_llvm(f, types)
             end
         end
     end
 
-    fc_run_bounds_check_elision_checks && VERSION >= v"1.11" &&
+    fc_run_bounds_error_name_checks &&
     @testset "Cartesian indexing of an array with static dimensions" begin
-        @testset "one bounds check" begin
-            @test @filecheck begin
-                @check "define"
-                @check_count 1 fc_bounds_error
-                @check_not fc_bounds_error
-                code_llvm(fc_getindex, (fc_static_dims_array, Int, Int, Int); debuginfo=:none)
-            end
-        end
         # The static sizes are constants (e.g. the multiplication by the first size), and the
         # size in the last dimension is not loaded.
         @testset "`@inbounds`: no bounds check, static sizes" begin
             @test @filecheck begin
                 @check "define"
                 @check_not fc_bounds_error_or_int_load
-                @check "mul i64 {{.*}}, 5"
+                @check "mul $fc_int {{.*}}, 5"
                 @check_not fc_bounds_error_or_int_load
                 @check "load double"
                 @check_not fc_bounds_error_or_int_load
                 @check "ret double"
-                code_llvm(fc_getindex_inbounds, (fc_static_dims_array, Int, Int, Int); debuginfo=:none)
+                fc_llvm(fc_getindex_inbounds, (fc_static_dims_array, Int, Int, Int))
             end
             @test @filecheck begin
                 @check "define"
@@ -491,7 +483,7 @@ build_is_production_build &&
                 @check "store double"
                 @check_not fc_bounds_error
                 @check "ret void"
-                code_llvm(fc_setindex_inbounds!, (fc_static_dims_array, Int, Int, Int, Float64); debuginfo=:none)
+                fc_llvm(fc_setindex_inbounds!, (fc_static_dims_array, Int, Int, Int, Float64))
             end
         end
     end
@@ -502,45 +494,23 @@ build_is_production_build &&
             @check "define"
             @check_not fc_bounds_error
             @check "ret double"
-            code_llvm(fc_sum_loop, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+            fc_llvm(fc_sum_loop, (FixedSizeVectorDefault{Float64},))
         end
     end
 
     fc_run_bounds_check_elision_checks &&
     @testset "in-place broadcasting: no allocation, no bounds check, vectorized" begin
-        @test @filecheck begin
-            @check "define"
-            @check_not fc_alloc_call
-            @check_not fc_bounds_error
-            @check "fadd <{{[0-9]+}} x double>"
-            @check_not fc_alloc_call
-            @check_not fc_bounds_error
-            @check "ret void"
-            code_llvm(fc_broadcast!, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
-        end
-        @test @filecheck begin
-            @check "define"
-            @check_not fc_alloc_call
-            @check_not fc_bounds_error
-            @check "fadd <{{[0-9]+}} x double>"
-            @check_not fc_alloc_call
-            @check_not fc_bounds_error
-            @check "ret void"
-            code_llvm(fc_broadcast!, (fc_static_dims_array,); debuginfo=:none)
-        end
-    end
-
-    fc_run_copy_checks &&
-    @testset "`copy` is one allocation and a bulk memory copy" begin
-        @test @filecheck begin
-            @check "define"
-            @check_not fc_bounds_error_or_loop
-            @check "jl_alloc_genericmemory"
-            @check_not fc_bounds_error_or_loop
-            @check "memmove"
-            @check_not fc_bounds_error_or_loop
-            @check "ret void"
-            code_llvm(fc_copy, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+        @testset "$(A)" for A in (FixedSizeVectorDefault{Float64}, fc_static_dims_array)
+            @test @filecheck begin
+                @check "define"
+                @check_not fc_alloc_call
+                @check_not fc_bounds_error
+                @check "fadd <{{[0-9]+}} x double>"
+                @check_not fc_alloc_call
+                @check_not fc_bounds_error
+                @check "ret void"
+                fc_llvm(fc_broadcast!, (A,))
+            end
         end
     end
 
@@ -557,21 +527,21 @@ build_is_production_build &&
                 @check "define"
                 @check_not fc_bounds_error
                 @check "store <{{[0-9]+}} x double>"
-                code_llvm(fill!, (A, Float64); debuginfo=:none)
+                fc_llvm(fill!, (A, Float64))
             end) skip=skipped
         end
     end
 
     @testset "broadcasting does not call `objectid` (issue #63)" begin
-        @test @filecheck begin
-            @check "define"
-            @check_not "object_id"
-            code_llvm(fc_broadcast_scale!, (FixedSizeVectorDefault{Float64}, Float64, FixedSizeVectorDefault{Float64}); debuginfo=:none)
-        end
-        @test @filecheck begin
-            @check "define"
-            @check_not "object_id"
-            code_llvm(fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        @testset "$(f)" for (f, types) in (
+            (fc_broadcast_scale!, (FixedSizeVectorDefault{Float64}, Float64, FixedSizeVectorDefault{Float64})),
+            (fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64})),
+        )
+            @test @filecheck begin
+                @check "define"
+                @check_not "object_id"
+                fc_llvm(f, types)
+            end
         end
     end
 
@@ -583,7 +553,7 @@ build_is_production_build &&
                 @check_not fc_bounds_error
                 @check "store <{{[0-9]+}} x double>"
                 @check_not fc_bounds_error
-                code_llvm(fc_store_loop!, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+                fc_llvm(fc_store_loop!, (FixedSizeVectorDefault{Float64},))
             end
         end
         @testset "`@simd ivdep` over `eachindex` of two arrays (issue #152)" begin
@@ -593,7 +563,7 @@ build_is_production_build &&
                 @check "vector.body"
                 @check "<{{[0-9]+}} x double>"
                 @check_not fc_bounds_error
-                code_llvm(fc_simd_ivdep!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}, Float64); debuginfo=:none)
+                fc_llvm(fc_simd_ivdep!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}, Float64))
             end
         end
     end
@@ -606,7 +576,7 @@ build_is_production_build &&
                 @check "define"
                 @check_not "{{$fc_bounds_error_alternatives|sdiv|udiv|srem|urem}}"
                 @check "ret double"
-                code_llvm(fc_sum_loop, (FixedSizeArrayDefault{Float64, N},); debuginfo=:none)
+                fc_llvm(fc_sum_loop, (FixedSizeArrayDefault{Float64, N},))
             end
         end
     end
@@ -619,7 +589,7 @@ build_is_production_build &&
             @check "add <{{[0-9]+}} x i8>"
             @check_not fc_bounds_error
             @check "ret i8"
-            code_llvm(fc_iterate_sum, (FixedSizeVectorDefault{Int8},); debuginfo=:none)
+            fc_llvm(fc_iterate_sum, (FixedSizeVectorDefault{Int8},))
         end
     end
 
@@ -632,7 +602,7 @@ build_is_production_build &&
             @check_count 1 fc_bounds_error
             @check_not fc_bounds_error
             @check_not fc_alloc_call
-            code_llvm(fc_getindex2, (FixedSizeMatrixDefault{Float64}, Int, Int); debuginfo=:none)
+            fc_llvm(fc_getindex2, (FixedSizeMatrixDefault{Float64}, Int, Int))
         end
     end
 
@@ -641,7 +611,7 @@ build_is_production_build &&
             @check "define"
             @check_not "{{apply_iterate|jl_apply_generic|jl_invoke}}"
             @check "ret"
-            code_llvm(fc_splat, (); debuginfo=:none)
+            fc_llvm(fc_splat, ())
         end
     end
 
@@ -649,7 +619,7 @@ build_is_production_build &&
         @test @filecheck begin
             @check "define"
             @check_not "{{_foldl_impl|sizehint}}"
-            code_llvm(fc_rest, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+            fc_llvm(fc_rest, (FixedSizeVectorDefault{Float64},))
         end
     end
 
@@ -659,7 +629,7 @@ build_is_production_build &&
             @check_next "top:"
             @check_next "ret $fc_int 3"
             @check_next "}"
-            code_llvm(fc_len_int32, (); debuginfo=:none)
+            fc_llvm(fc_len_int32, ())
         end
         # Julia 1.10 does not fold the product of mixed integer types.
         VERSION >= v"1.11" && @test @filecheck begin
@@ -667,7 +637,7 @@ build_is_production_build &&
             @check_next "top:"
             @check_next "ret $fc_int 6"
             @check_next "}"
-            code_llvm(fc_len_mixed, (); debuginfo=:none)
+            fc_llvm(fc_len_mixed, ())
         end
     end
 
@@ -680,13 +650,14 @@ build_is_production_build &&
             @check "icmp ne"
             @check_not "{{gcframe|jl_|j_}}"
             @check "ret i8"
-            code_llvm(fc_isassigned, (FixedSizeVectorDefault{String}, Int); debuginfo=:none)
+            fc_llvm(fc_isassigned, (FixedSizeVectorDefault{String}, Int))
         end
     end
 
     fc_run_copy_checks &&
-    @testset "`A[:]` and the copying constructor are one allocation and a bulk memory copy" begin
+    @testset "`copy`, `A[:]` and the copying constructor are one allocation and a bulk memory copy" begin
         @testset "$(f) $(T)" for (f, T) in (
+                (fc_copy, FixedSizeVectorDefault{Float64}),
                 (fc_colon, FixedSizeVectorDefault{Float64}),
                 (fc_colon, FixedSizeMatrixDefault{Float64}),
                 (fc_copy_constructor, FixedSizeVectorDefault{Float64}),
@@ -699,7 +670,7 @@ build_is_production_build &&
                 @check "memmove"
                 @check_not fc_bounds_error_or_loop
                 @check "ret void"
-                code_llvm(f, (T,); debuginfo=:none)
+                fc_llvm(f, (T,))
             end
         end
     end
@@ -714,7 +685,7 @@ build_is_production_build &&
             @check "memmove"
             @check_not "vector.body"
             @check "ret"
-            code_llvm(copyto!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+            fc_llvm(copyto!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}))
         end
     end
 
@@ -723,7 +694,7 @@ build_is_production_build &&
         @test @filecheck begin
             @check "define"
             @check_not "{{apply_generic|methoderror}}"
-            code_llvm(fc_copy!, (FixedSizeVectorDefault{Float64}, Vector{Float64}); debuginfo=:none)
+            fc_llvm(fc_copy!, (FixedSizeVectorDefault{Float64}, Vector{Float64}))
         end
     end
 end
