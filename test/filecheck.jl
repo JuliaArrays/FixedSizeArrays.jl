@@ -9,8 +9,15 @@ using InteractiveUtils: code_llvm
 const fc_alloc_call = "{{(i?jl_gc_(small|pool|big)_alloc|i?jl_alloc_(genericmemory|array))}}"
 # `Int` is `i32` on 32-bit platforms.
 const fc_int = "i$(Sys.WORD_SIZE)"
-# FileCheck regex matching a call to throw a bounds error, across Julia versions.
-const fc_bounds_error = "{{boundserror|bounds_error}}"
+# Alternatives of a FileCheck regex matching a call to throw a bounds error, across Julia
+# versions, and the regex itself.
+const fc_bounds_error_alternatives = "boundserror|bounds_error"
+const fc_bounds_error = "{{$fc_bounds_error_alternatives}}"
+# FileCheck regex matching a bounds error or the load of an `Int` (e.g. a dynamic size).
+const fc_bounds_error_or_int_load = "{{$fc_bounds_error_alternatives|load $fc_int}}"
+# FileCheck regex matching a bounds error or the body of a vectorized loop, for operations
+# which must be a bulk memory copy instead.
+const fc_bounds_error_or_loop = "{{$fc_bounds_error_alternatives|vector.body}}"
 
 # Elimination of the heap allocation of the underlying `Memory` only works reliably from
 # Julia 1.12 on, and requires bounds checking not to be forced on.
@@ -470,11 +477,11 @@ build_is_production_build &&
         @testset "`@inbounds`: no bounds check, static sizes" begin
             @test @filecheck begin
                 @check "define"
-                @check_not "{{bounds_error|boundserror|load i64}}"
+                @check_not fc_bounds_error_or_int_load
                 @check "mul i64 {{.*}}, 5"
-                @check_not "{{bounds_error|boundserror|load i64}}"
+                @check_not fc_bounds_error_or_int_load
                 @check "load double"
-                @check_not "{{bounds_error|boundserror|load i64}}"
+                @check_not fc_bounds_error_or_int_load
                 @check "ret double"
                 code_llvm(fc_getindex_inbounds, (fc_static_dims_array, Int, Int, Int); debuginfo=:none)
             end
@@ -527,11 +534,11 @@ build_is_production_build &&
     @testset "`copy` is one allocation and a bulk memory copy" begin
         @test @filecheck begin
             @check "define"
-            @check_not "{{vector.body|boundserror|bounds_error}}"
+            @check_not fc_bounds_error_or_loop
             @check "jl_alloc_genericmemory"
-            @check_not "{{vector.body|boundserror|bounds_error}}"
+            @check_not fc_bounds_error_or_loop
             @check "memmove"
-            @check_not "{{vector.body|boundserror|bounds_error}}"
+            @check_not fc_bounds_error_or_loop
             @check "ret void"
             code_llvm(fc_copy, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
         end
@@ -597,7 +604,7 @@ build_is_production_build &&
         @testset "N = $N" for N in 1:3
             @test @filecheck begin
                 @check "define"
-                @check_not "{{boundserror|bounds_error|sdiv|udiv|srem|urem}}"
+                @check_not "{{$fc_bounds_error_alternatives|sdiv|udiv|srem|urem}}"
                 @check "ret double"
                 code_llvm(fc_sum_loop, (FixedSizeArrayDefault{Float64, N},); debuginfo=:none)
             end
@@ -686,11 +693,11 @@ build_is_production_build &&
             )
             @test @filecheck begin
                 @check "define"
-                @check_not "{{vector.body|boundserror|bounds_error}}"
+                @check_not fc_bounds_error_or_loop
                 @check "jl_alloc_genericmemory"
-                @check_not "{{vector.body|boundserror|bounds_error}}"
+                @check_not fc_bounds_error_or_loop
                 @check "memmove"
-                @check_not "{{vector.body|boundserror|bounds_error}}"
+                @check_not fc_bounds_error_or_loop
                 @check "ret void"
                 code_llvm(f, (T,); debuginfo=:none)
             end
