@@ -20,15 +20,11 @@ function StaticArrayInterface.known_size(::Type{<:FixedSizeArrayDims{<:Any, <:An
     known_dims(D)
 end
 
+# The strides known from the static dimensions, with `nothing` for the others. (As for
+# `static_strides`, not the fallback of StaticArrayInterface.jl, which gives `(1,)` for a
+# 0-dimensional array.)
 function StaticArrayInterface.known_strides(::Type{<:FixedSizeArrayDims{<:Any, <:Any, D}}) where {D}
-    known_strides(D)
-end
-
-# The strides known from the dimensions of type `D`, with `nothing` for the others.
-@generated function known_strides(::Type{D}) where {D <: Tuple}
-    ks = known_dims(D)
-    isempty(ks) && return ()
-    Tuple(accumulate((s, k) -> (s === nothing || k === nothing) ? nothing : s * k, (1, Base.front(ks)...)))
+    Base.front(accumulate((s, k) -> (s === nothing || k === nothing) ? nothing : s * k, (1, known_dims(D)...)))
 end
 
 # The device of the memory backend, e.g. a GPU memory backend is not a CPU pointer (by

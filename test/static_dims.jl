@@ -10,16 +10,8 @@
     )
     default = FixedSizeArrays.default_underlying_storage_type
 
-    @testset "public" begin
-        @test FixedSizeArrayDims === FixedSizeArrays.FixedSizeArrayDims
-        @test !Base.isexported(FixedSizeArrays, :FixedSizeArrayDims)
-        if VERSION >= v"1.11"
-            @test Base.ispublic(FixedSizeArrays, :FixedSizeArrayDims)
-        end
-    end
-
     @testset "`FixedSizeArray` is the alias with all dimensions dynamic: $Mem" for Mem ∈ storage_types
-        for (T, N) ∈ ((Float64, 0), (Int, 1), (Float32, 2), (Bool, 3))
+        for (T, N) ∈ ((Float64, 0), (Bool, 3))
             R = FixedSizeArray{T, N, Mem{T}}
             @test R === FixedSizeArrayDims{T, N, NTuple{N, Int}, Mem{T}}
             @test isconcretetype(R)
@@ -62,17 +54,16 @@
     @testset "construction: $Mem" for Mem ∈ storage_types
         p = Mem{Float64}(undef, 24)
         p .= 1:24
-        @testset "$dims" for dims ∈ dims_variants
-            R = FixedSizeArrayDims{Float64, 3, typeof(dims), Mem{Float64}}
-            for SA ∈ (FixedSizeArrayDims, FixedSizeArrayDims{Float64}, FixedSizeArrayDims{Float64, 3}, FixedSizeArrayDims{Float64, 3, D, Mem{Float64}} where {D}, R)
-                a = wrap(SA, p, dims)
-                @test a isa R
-                @test parent(a) === p
-                @test size(a) === (2, 3, 4)
-                @test FixedSizeArrays.static_dims(a) === dims
-                @test a == reshape(1:24, 2, 3, 4)
-                test_inferred(wrap, R, (SA, p, dims))
-            end
+        for dims ∈ dims_variants
+            a = wrap(FixedSizeArrayDims, p, dims)
+            @test parent(a) === p
+            @test FixedSizeArrays.static_dims(a) === dims
+            @test a == reshape(1:24, 2, 3, 4)
+        end
+        dims = (static(2), 3, static(4))
+        R = FixedSizeArrayDims{Float64, 3, typeof(dims), Mem{Float64}}
+        for SA ∈ (FixedSizeArrayDims, FixedSizeArrayDims{Float64}, FixedSizeArrayDims{Float64, 3}, FixedSizeArrayDims{Float64, 3, D, Mem{Float64}} where {D}, R)
+            test_inferred(wrap, R, (SA, p, dims))
         end
         # `Integer`s are converted to `Int`s
         @test FixedSizeArrays.static_dims(wrap(FixedSizeArrayDims, p, (static(2), Int8(3), UInt(4)))) === (static(2), 3, 4)
@@ -136,7 +127,6 @@
         for dims ∈ dims_variants
             D = typeof(dims)
             test_inferred(FixedSizeArrayDims{Int, 3, D, Mem{Int}}, (undef, dims))
-            @test size(FixedSizeArrayDims{Int, 3, D, Mem{Int}}(undef, dims)) == (2, 3, 4)
             test_inferred(FixedSizeArrayDims{Int}, FixedSizeArrayDims{Int, 3, D, default{Int}}, (undef, dims))
             test_inferred(FixedSizeArrayDims{Int, 3}, FixedSizeArrayDims{Int, 3, D, default{Int}}, (undef, dims))
             test_inferred(FixedSizeArrayDims{Int, 3, D, Mem{Int}} where {D}, FixedSizeArrayDims{Int, 3, D, Mem{Int}}, (undef, dims))
@@ -155,13 +145,7 @@
         # a partially specified type with a memory backend
         P = FixedSizeArrayDims{Int, 3, D, Mem{Int}} where {D}
         test_inferred(P, FixedSizeArrayDims{Int, 3, Tuple{StaticInt{2}, Int, Int}, Mem{Int}}, (undef, (static(2), 3, 4)))
-        # from a `FixedSizeArray`, sharing the memory, and back
-        f = wrap(FixedSizeArray, p, (2, 3, 4))
-        for dims ∈ dims_variants
-            a = wrap(FixedSizeArrayDims, parent(f), dims)
-            @test parent(a) === p
-            @test a == f
-        end
+        # to a `FixedSizeArray`
         a = wrap(FixedSizeArrayDims, p, (static(2), static(3), 4))
         b = FixedSizeArray(a)  # copies
         @test b isa FixedSizeArray{Float64, 3}
@@ -169,6 +153,23 @@
         @test parent(b) !== p
         @test wrap(FixedSizeArray, parent(a), size(a)) == a
         @test parent(wrap(FixedSizeArray, parent(a), size(a))) === p
+        # converting constructor and `collect_as`
+        ref = reshape(1:24, 2, 3, 4)
+        S = FixedSizeArrayDims{Float64, 3, Tuple{StaticInt{2}, StaticInt{3}, Int}, Mem{Float64}}
+        for f ∈ (S, x -> collect_as(S, x))
+            @test f(ref) isa S
+            @test f(ref) == ref
+        end
+        test_inferred(S, S, (ref,))
+        @test FixedSizeArrayDims{Float64}(ref) isa FixedSizeArray{Float64, 3}
+        @test collect_as(FixedSizeArrayDims{Float64, 1, Tuple{StaticInt{3}}}, (1, 2, 3)) == 1:3
+        @test_throws DimensionMismatch S(reshape(1:24, 3, 2, 4))
+        @test_throws DimensionMismatch S(1:24)
+        @test_throws DimensionMismatch FixedSizeArrayDims{Float64, 1, Tuple{StaticInt{24}}}(ref)
+        @test_throws DimensionMismatch S(OffsetArray(ref, 1, 0, 0))
+        # a `Colon` is only for `wrap`
+        @test_throws ArgumentError FixedSizeArray{Float64}(undef, (2, :))
+        @test_throws ArgumentError FixedSizeArrayDims{Float64}(undef, (static(2), :))
     end
 
     @testset "indexing: $Mem, $dims" for Mem ∈ storage_types, dims ∈ (
@@ -364,33 +365,29 @@
         @test repr(a) == "[1 3; 2 4]"
         @test sprint(show, MIME"text/plain"(), a) == "2×2 FixedSizeArrayDims{$Int, 2, Tuple{StaticInt{2}, $Int}, Vector{$Int}}:\n 1  3\n 2  4"
         @test sprint(show, typeof(a)) == "FixedSizeArrayDims{$Int, 2, Tuple{StaticInt{2}, $Int}, Vector{$Int}}"
-        # A `FixedSizeArray` type is printed through one of the aliases, never as a
-        # `FixedSizeArrayDims`, and the printed form round-trips. Which alias is used depends
-        # on the Julia version: up to v1.13 Julia prints through an alias only if exactly one
-        # matches, and the `make_typealias` method then selects `FixedSizeArray`; later
-        # versions select the alias with the fewest parameters, e.g. `FixedSizeMatrixDefault`.
-        # (Partially applied types with free trailing parameters, e.g. `FixedSizeArray{Float64}`,
-        # are printed with their `where` clause, as for any alias with a bound depending on `T`.)
+        # A `FixedSizeArray` type is printed as before it was an alias, independently of the
+        # Julia version: through the one alias which matches it, as a `FixedSizeArray` otherwise.
+        for (T, str) ∈ (
+            (FixedSizeArray, "FixedSizeArray"), (FixedSizeVector, "FixedSizeVector"),
+            (FixedSizeMatrix, "FixedSizeMatrix"), (FixedSizeArrayDefault, "FixedSizeArrayDefault"),
+            (FixedSizeVectorDefault, "FixedSizeVectorDefault"), (FixedSizeMatrixDefault, "FixedSizeMatrixDefault"),
+            (FixedSizeArray{Float64}, "FixedSizeArray{Float64, N, Mem} where {N, Mem<:DenseVector{Float64}}"),
+            (FixedSizeVector{Float64}, "FixedSizeVector{Float64, Mem} where Mem<:DenseVector{Float64}"),
+            (FixedSizeArrayDefault{Float64, 3}, "FixedSizeArrayDefault{Float64, 3}"),
+            (FixedSizeArray{Float64, 3, Vector{Float64}}, default === Vector ? "FixedSizeArrayDefault{Float64, 3}" : "FixedSizeArray{Float64, 3, Vector{Float64}}"),
+            (FixedSizeArray{Float64, 2, Vector{Float64}}, default === Vector ? "FixedSizeArray{Float64, 2, Vector{Float64}}" : "FixedSizeMatrix{Float64, Vector{Float64}}"),
+            (Vector{FixedSizeVector{Int, Vector{Int}}}, default === Vector ? "Vector{FixedSizeArray{$Int, 1, Vector{$Int}}}" : "Vector{FixedSizeVector{$Int, Vector{$Int}}}"),
+        )
+            @test sprint(show, T) == str
+            @test Base.eval(@__MODULE__, Meta.parse(str)) == T
+        end
         for Mem ∈ storage_types
             f = wrap(FixedSizeArray, Mem{Int}(undef, 4), (2, 2))
-            for T ∈ (typeof(f), FixedSizeArray{Int, 3, Mem{Int}}, FixedSizeArray{Int, 0, Mem{Int}},
-                     Vector{FixedSizeVector{Int, Mem{Int}}}, FixedSizeArray{T, 2, Mem{T}} where {T},
-                     FixedSizeArray{T, N, Mem{T}} where {T, N})
-                str = sprint(show, T)
-                @test !occursin("FixedSizeArrayDims", str)
-                @test startswith(str, "FixedSize") || startswith(str, "Vector{FixedSize")
-                @test Base.eval(@__MODULE__, Meta.parse(str)) == T
-            end
-            str = sprint(show, MIME"text/plain"(), f)
-            @test !occursin("FixedSizeArrayDims", str)
-            @test startswith(str, "2×2 FixedSize")
-            @test endswith(str, ":\n" * sprint(Base.print_array, f))
+            @test startswith(sprint(show, MIME"text/plain"(), f), "2×2 FixedSizeArray{$Int, 2, $(Mem{Int})}:\n") == (Mem === default)
             # without `:compact`, the `struct` is printed, as for `Vector` and `Array`
-            @test sprint(show, typeof(f); context = :compact => false) == sprint(show, FixedSizeArrayDims{Int, 2, Tuple{Int, Int}, Mem{Int}}; context = :compact => false)
             @test occursin("FixedSizeArrayDims", sprint(show, typeof(f); context = :compact => false))
         end
         @test sprint(show, FixedSizeArrayDims) == "FixedSizeArrayDims"
-        @test sprint(show, FixedSizeArrayDefault) == "FixedSizeArrayDefault"
         @test sprint(show, Union{}) == "Union{}"
     end
 

@@ -35,23 +35,22 @@ Base.@constprop :aggressive function inferred_shape(::Type{<:AbstractArray}, ite
     inferred_shape_impl(infer_ndims(iterator), iterator)
 end
 
-function (collect::Collect)(::Type{FSA}, iterator) where {FSA<:FixedSizeArray}
+# Collect into the memory backend, then wrap it with the dimensions converted to the
+# dimensions type of `FSA`.
+function (collect::Collect)(::Type{FSA}, iterator) where {FSA<:FixedSizeArrayDims}
     T = check_constructor_is_allowed(FSA)
     if iterator isa FSA
         return copy(iterator)
     end
-    mem = parent_type_with_default(T)
-    shape = inferred_shape(T, iterator)
-    backing = collect(mem, iterator)
-    fsv = new_fixed_size_array(backing, (length(backing),))
-    reshape(fsv, shape)
+    backing = collect(parent_type_with_default(T), iterator)
+    wrap(T, backing, inferred_shape(T, iterator))
 end
 
-function collect_as_haseltype(::Type{FSA}, iterator) where {T, FSA<:FixedSizeArray{T}}
+function collect_as_haseltype(::Type{FSA}, iterator) where {T, FSA<:FixedSizeArrayDims{T}}
     collect_as(check_constructor_is_allowed(FSA), iterator)
 end
 
-function collect_as_haseltype(::Type{FSA}, iterator) where {FSA<:FixedSizeArray}
+function collect_as_haseltype(::Type{FSA}, iterator) where {FSA<:FixedSizeArrayDims}
     T = check_constructor_is_allowed(FSA){eltype(iterator)}
     collect_as(T, iterator)
 end

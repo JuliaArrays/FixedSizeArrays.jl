@@ -11,12 +11,15 @@ Use `collect_as` from the [Collects.jl](https://github.com/JuliaCollections/Coll
 
 Here is a quick summary of high-level differences between some different array types:
 
-|                  | Size set at... | Data backend | Growable | Mutable elements |
-|------------------|----------------|--------------|----------|------------------|
-| `Base.Array`     | runtime        | `Memory`     | ✅       | ✅               |
-| `FixedSizeArray` | runtime        | `Memory`     | ❌       | ✅               |
-| `MArray`         | compile time   | `Tuple`      | ❌       | ✅               |
-| `SArray`         | compile time   | `Tuple`      | ❌       | ❌               |
+|                      | Size set at...                      | Data backend          | Growable | Mutable elements |
+|----------------------|-------------------------------------|-----------------------|----------|------------------|
+| `Base.Array`         | runtime                             | `Memory`              | ✅       | ✅               |
+| `FixedSizeArray`     | runtime                             | any `DenseVector`     | ❌       | ✅               |
+| `FixedSizeArrayDims` | compile time or runtime, per dimension | any `DenseVector`  | ❌       | ✅               |
+| `MArray`             | compile time                        | `Tuple`               | ❌       | ✅               |
+| `SArray`             | compile time                        | `Tuple`               | ❌       | ❌               |
+| `HybridArray`        | compile time or runtime, per dimension | any `AbstractArray` | ❌       | depends on the parent |
+| `StrideArray`, `PtrArray` | compile time or runtime, per dimension | a pointer     | ❌       | ✅               |
 
 In the following sections we elaborate on the properties and strengths of the various types.
 
@@ -43,6 +46,19 @@ Main differences between `FixedSizeArray` and `MArray` are:
 There are applications where it may be desirable to dispatch on the size of an array, in that case `FixedSizeArray` would not be a good fit and you may consider using `MArray` instead.
 
 `FixedSizeArray` is not a direct replacement for `SArray`: in addition to having the size as part of the type parameters, `SArray` is immutable, instead the elements of a `FixedSizeArray` can be changed at any point.
+
+### Static dimensions: `FixedSizeArrayDims`, `HybridArray` and `StrideArray`
+
+[`FixedSizeArrays.FixedSizeArrayDims`](@ref) is the type underlying `FixedSizeArray`, in which each dimension can be static (a `StaticInt` from [Static.jl](https://github.com/SciML/Static.jl), part of the type) or dynamic (an `Int`), see [Static dimensions: the `FixedSizeArrayDims` type](@ref).
+Other packages also mix static and dynamic dimensions:
+
+* [HybridArrays.jl](https://github.com/JuliaArrays/HybridArrays.jl) builds on StaticArrays.jl, using `StaticArrays.Dynamic()` for the dynamic dimensions, so that e.g. indexing along the static dimensions can return static arrays.
+  It wraps any parent array, so it can be non-contiguous, while a `FixedSizeArrayDims` is always a `DenseArray` backed by the whole memory backend.
+* [StrideArraysCore.jl](https://github.com/JuliaSIMD/StrideArraysCore.jl) uses the same `Int`/`StaticInt` tuples for the sizes, and adds static strides and offsets, for LoopVectorization.jl.
+  Its arrays are built around a pointer (a `PtrArray` must be kept alive with `GC.@preserve`), while a `FixedSizeArrayDims` holds a reference to its memory backend, so the garbage collector knows about it, and the memory backend can be a GPU vector.
+  The StaticArrayInterface.jl package extension makes `FixedSizeArrayDims`s work with StrideArraysCore.jl and LoopVectorization.jl, too.
+
+Compared to a `FixedSizeArray`, an array with static dimensions trades generality for speed: the static dimensions must be known at compile time, and each combination of them is a different type, so the code using it is compiled for each one.
 
 ## What about the other package with same name?
 

@@ -135,29 +135,9 @@ The dimensions given to a constructor are converted to the dimensions type of th
 Out-of-place broadcasting, `reshape` and `vec` return `FixedSizeArray`s, too.
 With the package extension for [StaticArrayInterface.jl](https://github.com/JuliaArrays/StaticArrayInterface.jl), the static sizes and strides are available to packages such as LoopVectorization.jl, StrideArraysCore.jl and Polyester.jl.
 Unlike for `FixedSizeArray`s, `Adapt.adapt` adapts the memory backend of an array with static dimensions and wraps it again, e.g. `adapt(CuArray, a)` returns a `FixedSizeArrayDims` backed by a `CuVector`.
+`FixedSizeArrayDims` itself is not an `Adapt.adapt` target: `adapt(FixedSizeArrayDims, x)` returns `x` unchanged, since the static dimensions can not be derived from `x`; use the constructor, e.g. `FixedSizeArrayDims{Float64, 2, Tuple{StaticInt{2}, Int}}(x)`, instead.
 
-### Comparison with other array types
-
-Several packages in the Julia ecosystem encode sizes in the type.
-They differ in which dimensions can be static, and in where the elements live:
-
-| Array type | Static dimensions | Storage |
-|:-----------|:------------------|:--------|
-| `Array` | none, and a `Vector` can be resized | heap |
-| [`FixedSizeArray`](@ref) | none, but the size never changes | any `DenseVector` memory backend |
-| `SArray`, `MArray` ([StaticArrays.jl](https://github.com/JuliaArrays/StaticArrays.jl)) | all | inline (`SArray`, immutable) or a mutable object (`MArray`) |
-| `HybridArray` ([HybridArrays.jl](https://github.com/JuliaArrays/HybridArrays.jl)) | any, using `StaticArrays.Dynamic()` for the dynamic ones | any parent `AbstractArray` |
-| `StrideArray`, `PtrArray` ([StrideArraysCore.jl](https://github.com/JuliaSIMD/StrideArraysCore.jl)) | any, using `StaticInt`s; also static strides and offsets | a pointer (`PtrArray`, which must be kept alive with `GC.@preserve`), plus its memory for `StrideArray` |
-| `FixedSizeArrayDims` | any, using `StaticInt`s | any `DenseVector` memory backend |
-
-* StaticArrays.jl targets small arrays whose whole size is known, e.g. points or small matrices: the size is part of the type, and operations are unrolled.
-  For large arrays, or ones with a dimension only known at runtime, it is not suitable.
-* HybridArrays.jl also mixes static and dynamic dimensions, building on StaticArrays.jl, so that e.g. indexing along the static dimensions can return static arrays.
-  It wraps any parent array, so it can be non-contiguous, while a `FixedSizeArrayDims` is always a `DenseArray` backed by the whole memory backend.
-* StrideArraysCore.jl uses the same `Int`/`StaticInt` tuples for the sizes, and adds static strides and offsets, for LoopVectorization.jl.
-  Its arrays are built around a pointer, while a `FixedSizeArrayDims` holds a reference to its memory backend, so the garbage collector knows about it, and the memory backend can be a GPU vector.
-  The StaticArrayInterface.jl package extension makes `FixedSizeArrayDims`s work with StrideArraysCore.jl and LoopVectorization.jl, too.
-* Compared to a `FixedSizeArray`, an array with static dimensions trades generality for speed: the static dimensions must be known at compile time, and each combination of them is a different type, so the code using it is compiled for each one.
+See the [comparison with other array types](@ref "Comparison with other array types") for how `FixedSizeArrayDims` relates to StaticArrays.jl, HybridArrays.jl and StrideArraysCore.jl.
 
 ## The `collect_as` utility
 

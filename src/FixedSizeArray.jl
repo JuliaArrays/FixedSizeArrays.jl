@@ -41,6 +41,7 @@ dimensions, see [`FixedSizeArray`](@ref) and [`FixedSizeArrays.wrap`](@ref):
 
     FixedSizeArrayDims{T}(undef, dims::Tuple)
     FixedSizeArrayDims{T,N,D,Mem}(undef, dims::Tuple)
+    FixedSizeArrayDims{T,N,D,Mem}(array::AbstractArray)
     FixedSizeArrays.wrap(FixedSizeArrayDims, parent::DenseVector, dims::Tuple)
 
 !!! note
@@ -88,12 +89,8 @@ The static dimensions allow the compiler to compute the linear indices, the stri
 the sizes in these dimensions at compile time, which is useful e.g. for arrays where some
 dimensions are fixed (variables, nodes, ...) while others (elements of a mesh, particles,
 ...) change at runtime. An array with static dimensions is constructed with the
-[`FixedSizeArrayDims`](@ref) `undef` constructors, or with [`FixedSizeArrays.wrap`](@ref)
-around an existing memory backend:
-
-    FixedSizeArrayDims{T}(undef, dims::Tuple)
-    FixedSizeArrayDims{T,N,D,Mem}(undef, dims::Tuple)
-    FixedSizeArrays.wrap(FixedSizeArrayDims, parent::DenseVector, dims::Tuple)
+[`FixedSizeArrayDims`](@ref) constructors, with `collect_as`, or with
+[`FixedSizeArrays.wrap`](@ref) around an existing memory backend.
 
 The dimensions given to a constructor are converted to the dimensions type of the array, if
 its type gives it: e.g. `FixedSizeArray{T}(undef, (static(2), 3))` has two dynamic
@@ -123,23 +120,6 @@ julia> size(b), size(b, 1), strides(b)
 ```
 """
 const FixedSizeArray{T,N,Mem<:DenseVector{T}} = FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}
-
-# Printing of the types: Julia prints a type through an alias only if exactly one alias
-# matches it, and several of ours match a `FixedSizeArray` type with one or two dimensions
-# (e.g. `FixedSizeVector` and `FixedSizeVectorDefault`), so by default a `FixedSizeArray{T,N,Mem}`
-# would be printed as a `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`. In that case, print it as
-# a `FixedSizeArray`. (`make_typealias` is an internal function of `Base`, used by `show`
-# for types since Julia v1.6; if it disappears, only the printing changes.)
-if isdefined(Base, :make_typealias)
-    function Base.make_typealias(@nospecialize(x::Type{<:FixedSizeArray}))
-        alias = invoke(Base.make_typealias, Tuple{Type}, x)
-        alias === nothing || return alias
-        body = Base.unwrap_unionall(x)
-        body isa DataType || return nothing  # e.g. `Union{}`
-        # the parameters `T`, `N` and `Mem` of the alias (the dimensions type is `NTuple{N,Int}`)
-        (GlobalRef(@__MODULE__, :FixedSizeArray), Core.svec(body.parameters[1], body.parameters[2], body.parameters[4]))
-    end
-end
 
 function Base.propertynames(
     # the `unused` is here because of https://github.com/JuliaLang/julia/issues/44428
@@ -175,6 +155,8 @@ const FixedSizeArrayAllowedConstructorType = let
     }
 end
 
+# (only the `FixedSizeArray` constructors are restricted)
+check_constructor_is_allowed(::Type{T}) where {T <: FixedSizeArrayDims} = T
 function check_constructor_is_allowed(::Type{T}) where {T <: FixedSizeArray}
     if Type{T} <: FixedSizeArrayAllowedConstructorType
         T
@@ -215,9 +197,9 @@ Return the dimensions of `a`, a tuple of `StaticInt`s and `Int`s.
 """
 static_dims(a::FixedSizeArrayDims) = getfield(a, :dims)
 
-# `Integer`s as `Int`s, `Colon`s (and `StaticInt`s, in the Static.jl extension) as they are
-to_static_dim(d::Colon) = d
+# `Integer`s as `Int`s, `StaticInt`s (in the Static.jl extension) as they are
 to_static_dim(d::Integer) = Int(d)::Int
+to_static_dim(::Colon) = throw(ArgumentError("a `Colon` dimension is only supported by `FixedSizeArrays.wrap`"))
 
 Base.size(a::FixedSizeArrayDims) = map(dim_value, static_dims(a))
 
@@ -365,9 +347,8 @@ end
 # Cartesian indexing: the column-major linear index of the (in-bounds) indices `inds` for
 # the dimensions `dims`, as a sum of strided terms, e.g.
 # `1 + (i - 1) + n1 * (j - 1) + (n1 * n2) * (k - 1)` for the indices `(i, j, k)`, where the
-# strides are constants as long as the dimensions before them are static.  (Unlike the
-# Horner form `i + n1 * ((j - 1) + n2 * (k - 1))`, the terms of indices that don't change
-# in a loop can be hoisted out of it if the dimensions are dynamic.)
+# strides are constants as long as the dimensions before them are static. This is the
+# computation of `Base` (`_sub2ind`), but with the strides from the static dimensions.
 function static_size_linear_index(dims::Tuple{Vararg{Any, N}}, inds::NTuple{N, Int}) where {N}
     terms = map((s, i) -> s * (i - 1), Base.size_to_strides(1, map(dim_value, dims)...), inds)
     +(1, terms...)
@@ -545,7 +526,7 @@ axes_are_one_based(axes) = all(isone ∘ first, axes)
 
 # converting constructors for copying other array types
 
-function converting_constructor(::Type{FSA}, src::AbstractArray) where {FSA <: FixedSizeArray}
+function converting_constructor(::Type{FSA}, src::AbstractArray) where {FSA <: FixedSizeArrayDims}
     axs = axes(src)
     if !axes_are_one_based(axs)
         throw(DimensionMismatch("source array has a non-one-based indexing axis"))
@@ -553,14 +534,14 @@ function converting_constructor(::Type{FSA}, src::AbstractArray) where {FSA <: F
     collect_as_haseltype(FSA, src)
 end
 
-function (::Type{FSA})(src::AbstractArray) where {N, FSA <: FixedSizeArray{<:Any, N}}
+function (::Type{FSA})(src::AbstractArray) where {N, FSA <: FixedSizeArrayDims{<:Any, N}}
     if N::Int != ndims(src)
         throw(DimensionMismatch("dimensionality mismatch"))
     end
     converting_constructor(FSA, src)
 end
 
-function (::Type{FSA})(src::AbstractArray) where {FSA <: FixedSizeArray}
+function (::Type{FSA})(src::AbstractArray) where {FSA <: FixedSizeArrayDims}
     converting_constructor(FSA, src)
 end
 
@@ -658,7 +639,7 @@ function resolve_colon(dims::Tuple, len::Int)
     if length(others) != length(dims) - 1
         throw(ArgumentError(lazy"at most one dimension can be a `Colon`, got $dims"))
     end
-    m = checked_dims(map(dim_value, others))
+    m = checked_dims(map(dim_value ∘ to_static_dim, others))
     if iszero(m)
         throw(ArgumentError(lazy"can not compute the size of the `Colon` dimension from the length of the parent for the dimensions $dims"))
     end
@@ -673,7 +654,9 @@ end
     FixedSizeArrays.wrap(FixedSizeArray, parent::DenseVector, size::NTuple{N,Integer})
     FixedSizeArrays.wrap(FixedSizeArray, parent::DenseVector, size1::Integer, size2::Integer, ...)
     FixedSizeArrays.wrap(FixedSizeArray, parent::DenseVector)
-    FixedSizeArrays.wrap(FixedSizeArrayDims, parent::DenseVector, dims::Tuple)
+    FixedSizeArrays.wrap(FixedSizeArrayDims, parent::DenseVector, size::NTuple{N,Integer})
+    FixedSizeArrays.wrap(FixedSizeArrayDims, parent::DenseVector, size1::Integer, size2::Integer, ...)
+    FixedSizeArrays.wrap(FixedSizeArrayDims, parent::DenseVector)
 
 Return a [`FixedSizeArray`](@ref) of the given `size` which uses `parent` as its memory backend,
 without copying.
@@ -681,7 +664,7 @@ without copying.
 At most one dimension can be given as `:`, it is then computed from `length(parent)`.
 Without `size`, the result is a vector of length `length(parent)`.
 
-With [`FixedSizeArrayDims`](@ref) as the first argument, `dims` can also contain
+With [`FixedSizeArrayDims`](@ref) as the first argument, the dimensions can also be
 `StaticInt`s, for an array with static dimensions.
 
 The first argument can also be a more specific type, e.g. `FixedSizeArray{T,N,Mem}` or
@@ -740,7 +723,7 @@ julia> size(FixedSizeArrays.wrap(FixedSizeArrayDims, resize!(v, 18), (static(2),
 ```
 """
 function wrap(::Type{FSA}, parent::DenseVector, dims::Tuple) where {FSA <: FixedSizeArrayDims}
-    d = convert_dims(dims_type(FSA), resolve_colon(map(to_static_dim, check_ndims(FSA, dims)), length(parent)))
+    d = convert_dims(dims_type(FSA), resolve_colon(check_ndims(FSA, dims), length(parent)))
     len = checked_dims(map(dim_value, d))
     if length(parent) != len
         throw(DimensionMismatch(lazy"length of the parent ($(length(parent))) does not match the product of the dimensions $d"))
@@ -788,3 +771,68 @@ const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
 Construct a [`FixedSizeMatrix`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
 """
 const FixedSizeMatrixDefault = FixedSizeArrayDefault{T, 2} where {T}
+
+# Printing of the types, as when `FixedSizeArray` was the `struct`: Julia prints a type
+# through an alias if exactly one alias matches it, and `FixedSizeArray` is now an alias too,
+# so it would make the other aliases ambiguous. Instead, a `FixedSizeArray` type is printed
+# as one of the aliases below if exactly that one matches it, and as a `FixedSizeArray{T,N,Mem}`
+# otherwise, independently of the Julia version. (This is a method of `show` rather than of
+# `Base.make_typealias`, as a method of the latter invalidates much of the printing code.
+# `make_wheres`, `show_typealias` & co. are internal functions of `Base`, used by `show`
+# for types since Julia v1.6; if they disappear, only the printing changes.)
+const printing_aliases = (
+    :FixedSizeVector, :FixedSizeMatrix,
+    :FixedSizeArrayDefault, :FixedSizeVectorDefault, :FixedSizeMatrixDefault,
+)
+
+# The parameters of the alias `alias` which give `x`, `nothing` if there are none (adapted
+# from `Base.make_typealias`).
+function alias_parameters(@nospecialize(x::Type), @nospecialize(alias::UnionAll))
+    x <: alias || return nothing
+    (_, env) = ccall(:jl_type_intersection_with_env, Any, (Any, Any), x, alias)::Core.SimpleVector
+    applied = try
+        alias{env...}
+    catch ex
+        ex isa TypeError || rethrow()
+        return nothing
+    end
+    applied = Base.rewrap_unionall(applied, x)
+    (!Base.has_free_typevars(applied) && applied === x) ? env : nothing
+end
+
+# The alias to print `x` with, and its parameters.
+function printing_alias(@nospecialize(x::Type{<:FixedSizeArray}))
+    match = nothing
+    for name ∈ printing_aliases
+        env = alias_parameters(x, getfield(@__MODULE__, name))
+        env === nothing && continue
+        match === nothing || return fixed_size_array_parameters(x)  # ambiguous
+        match = (GlobalRef(@__MODULE__, name), env)
+    end
+    something(match, fixed_size_array_parameters(x))
+end
+
+# the parameters `T`, `N` and `Mem` of `FixedSizeArray` (the dimensions type is `NTuple{N,Int}`)
+function fixed_size_array_parameters(@nospecialize(x::Type{<:FixedSizeArray}))
+    body = Base.unwrap_unionall(x)::DataType
+    (GlobalRef(@__MODULE__, :FixedSizeArray), Core.svec(body.parameters[1], body.parameters[2], body.parameters[4]))
+end
+
+if all(f -> isdefined(Base, f), (:makeproper, :make_wheres, :show_typealias, :show_wheres))
+    function Base.show(io::IO, @nospecialize(x::Type{<:FixedSizeArray}))
+        properx = Base.makeproper(io, x)
+        if x === Union{} || !(properx <: FixedSizeArray) || !(get(io, :compact, true)::Bool)
+            return invoke(show, Tuple{IO, Type}, io, x)
+        end
+        # the aliases themselves are printed by their name, without a `where` clause
+        for name ∈ (:FixedSizeArray, printing_aliases...)
+            if x === getfield(@__MODULE__, name)
+                return Base.show_typealias(io, GlobalRef(@__MODULE__, name), x, Core.svec(), TypeVar[])
+            end
+        end
+        (name, env) = printing_alias(properx)
+        wheres = Base.make_wheres(io, env, x)
+        Base.show_typealias(io, name, x, env, wheres)
+        Base.show_wheres(io, wheres)
+    end
+end
