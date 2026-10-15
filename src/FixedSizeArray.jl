@@ -818,12 +818,17 @@ function fixed_size_array_parameters(@nospecialize(x::Type{<:FixedSizeArray}))
     (GlobalRef(@__MODULE__, :FixedSizeArray), Core.svec(body.parameters[1], body.parameters[2], body.parameters[4]))
 end
 
-if all(f -> isdefined(Base, f), (:makeproper, :make_wheres, :show_typealias, :show_wheres))
+if all(f -> isdefined(Base, f), (:make_wheres, :show_typealias, :show_wheres))
     function Base.show(io::IO, @nospecialize(x::Type{<:FixedSizeArray}))
-        properx = Base.makeproper(io, x)
-        # (not for `Union{}` and `Union`s of `FixedSizeArray` types, which are `FixedSizeArray`
-        # types too, but have no parameters)
-        if !(Base.unwrap_unionall(properx) isa DataType) || !(properx <: FixedSizeArray) || !(get(io, :compact, true)::Bool)
+        # Not for `Union{}` and `Union`s of `FixedSizeArray` types (`FixedSizeArray` types too,
+        # but without parameters), nor for types with free type variables, as in the method
+        # signatures printed by `methods` and in `MethodError`s: Julia does not reliably
+        # dispatch those to this method (once a type has been printed with the method of
+        # `Base`, they are dispatched by their kind), so they are always printed by `Base`.
+        # `Base` prints them through an alias only if the bounds of the alias are repeated,
+        # e.g. for `f(::FixedSizeArray{T,N,Mem}) where {T,N,Mem<:DenseVector{T}}`, while
+        # `f(::FixedSizeArray{T,N,Mem}) where {T,N,Mem}` is printed as a `FixedSizeArrayDims`.
+        if !(Base.unwrap_unionall(x) isa DataType) || Base.has_free_typevars(x) || !(get(io, :compact, true)::Bool)
             return invoke(show, Tuple{IO, Type}, io, x)
         end
         # the aliases themselves are printed by their name, without a `where` clause
@@ -832,7 +837,7 @@ if all(f -> isdefined(Base, f), (:makeproper, :make_wheres, :show_typealias, :sh
                 return Base.show_typealias(io, GlobalRef(@__MODULE__, name), x, Core.svec(), TypeVar[])
             end
         end
-        (name, env) = printing_alias(properx)
+        (name, env) = printing_alias(x)
         wheres = Base.make_wheres(io, env, x)
         Base.show_typealias(io, name, x, env, wheres)
         Base.show_wheres(io, wheres)

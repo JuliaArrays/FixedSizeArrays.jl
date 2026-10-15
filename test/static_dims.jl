@@ -2,6 +2,14 @@
 # static sizes and strides, `similar` & co., broadcasting, printing and StaticArrayInterface.jl.
 # Included from `runtests.jl`, inside the outer test set, which provides the helpers.
 
+# Methods with `FixedSizeArray` types in their signatures, for the tests of the printing of
+# the signatures by `methods` and in `MethodError`s.
+fsa_show_1(::FixedSizeArray{T, N, Mem}) where {T, N, Mem <: DenseVector{T}} = nothing
+fsa_show_2(::FixedSizeVector{Float64}) = nothing
+fsa_show_3(::FixedSizeArray) = nothing
+fsa_show_4(::FixedSizeArrayDims{T, N, D, Mem}) where {T, N, D, Mem} = nothing
+fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
+
 @testset verbose=true "`FixedSizeArrayDims`: static dimensions" begin
     # dimensions `(2, 3, 4)` with all combinations of static and dynamic dimensions
     dims_variants = (
@@ -389,6 +397,20 @@
         end
         @test sprint(show, FixedSizeArrayDims) == "FixedSizeArrayDims"
         @test sprint(show, Union{}) == "Union{}"
+        # Method signatures, as printed by `methods` and in `MethodError`s: types with free type
+        # variables are always printed by `Base`, through an alias only if its bounds are
+        # repeated in the signature.
+        for (f, str, broken) ∈ (
+            (fsa_show_1, "fsa_show_1(::FixedSizeArray{T, N, Mem}) where {T, N, Mem<:DenseVector{T}}", false),
+            (fsa_show_2, "fsa_show_2(::FixedSizeVector{Float64, Mem} where Mem<:DenseVector{Float64})", false),
+            (fsa_show_3, "fsa_show_3(::FixedSizeArray)", false),
+            (fsa_show_4, "fsa_show_4(::FixedSizeArrayDims{T, N, D, Mem}) where {T, N, D, Mem}", false),
+            # a known limitation: without the bound `Mem<:DenseVector{T}`, the type is not a
+            # subtype of the alias `FixedSizeArray`, and is printed as a `FixedSizeArrayDims`
+            (fsa_show_5, "fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem}", true),
+        )
+            @test startswith(sprint(show, only(methods(f))), str) broken=broken
+        end
         # `Union`s of `FixedSizeArray` types are `FixedSizeArray` types too: printed by `Base`
         for U ∈ (
             Union{FixedSizeVector{Int, Vector{Int}}, FixedSizeMatrix{Int, Vector{Int}}},
