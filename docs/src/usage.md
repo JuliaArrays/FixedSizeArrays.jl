@@ -24,12 +24,12 @@ julia> arr = [10 20; 30 14]
  30  14
 
 julia> FixedSizeArray(arr)  # construct from an `AbstractArray` value
-2×2 FixedSizeArray{Int64, 2, Memory{Int64}}:
+2×2 FixedSizeArrays.FixedSizeArrayDims{Int64, 2, Tuple{Int64, Int64}, Memory{Int64}}:
  10  20
  30  14
 
 julia> FixedSizeArray{Float64}(arr)  # construct from an `AbstractArray` value while converting element type
-2×2 FixedSizeArray{Float64, 2, Memory{Float64}}:
+2×2 FixedSizeArrays.FixedSizeArrayDims{Float64, 2, Tuple{Int64, Int64}, Memory{Float64}}:
  10.0  20.0
  30.0  14.0
 ```
@@ -45,7 +45,7 @@ julia> arr = transpose([10 20; 30 14])
  20  14
 
 julia> adapt(FixedSizeArray, arr)
-2×2 transpose(::FixedSizeArray{Int64, 2, Memory{Int64}}) with eltype Int64:
+2×2 transpose(::FixedSizeArrays.FixedSizeArrayDims{Int64, 2, Tuple{Int64, Int64}, Memory{Int64}}) with eltype Int64:
  10  30
  20  14
 ```
@@ -150,17 +150,17 @@ julia> iter = (i for i ∈ 7:9 if i≠8);
 julia> using FixedSizeArrays, Collects
 
 julia> collect_as(FixedSizeArray, iter)  # construct from an arbitrary iterator
-2-element FixedSizeArray{Int64, 1, Memory{Int64}}:
+2-element FixedSizeArrays.FixedSizeArrayDims{Int64, 1, Tuple{Int64}, Memory{Int64}}:
  7
  9
 
 julia> collect_as(FixedSizeArray{Float64}, iter)  # construct from an arbitrary iterator while converting element type
-2-element FixedSizeArray{Float64, 1, Memory{Float64}}:
+2-element FixedSizeArrays.FixedSizeArrayDims{Float64, 1, Tuple{Int64}, Memory{Float64}}:
  7.0
  9.0
 
 julia> collect_as(FixedSizeVectorDefault, (3.14, -4.2, 2.68))  # construct from a tuple
-3-element FixedSizeArray{Float64, 1, Memory{Float64}}:
+3-element FixedSizeArrays.FixedSizeArrayDims{Float64, 1, Tuple{Int64}, Memory{Float64}}:
   3.14
  -4.2
   2.68
