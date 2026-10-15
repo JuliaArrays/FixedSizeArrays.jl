@@ -141,6 +141,85 @@ function fc_201_kernel!(du, nelem)
     return nothing
 end
 
+# Broadcasting, whose aliasing check must use `Base.dataids` instead of `objectid`, see
+# issues #19 and #63, and PR #64.
+fc_broadcast_scale!(B, a, A) = (B .= a .* A; nothing)
+fc_broadcast_copy!(B, A) = (B .= A; nothing)
+
+# Out-of-bounds Cartesian indexing must not capture the array in the error, otherwise the
+# heap allocation of the `Memory` cannot be eliminated, see issue #175 and PR #176.
+function fc_fill_reduce_2d(n, i, j)
+    a = FixedSizeMatrixDefault{Float64}(undef, 3, 4)
+    fill!(a, n)
+    a[i, j] = 0
+    return sum(a)
+end
+
+# Stores in a loop without `@inbounds`, see issue #70 and PR #68.
+function fc_store_loop!(v)
+    for i in eachindex(v)
+        v[i] = i
+    end
+    return nothing
+end
+
+# `@simd ivdep` loop over `eachindex` of two arrays, see issue #152.
+const fc_coeffs = (0.1, 0.2, 0.3, 0.4, 0.5)
+function fc_simd_ivdep!(out, x, c)
+    @simd ivdep for i in eachindex(out, x)
+        out[i] = muladd(c, evalpoly(x[i], fc_coeffs), out[i])
+    end
+    return nothing
+end
+
+# Iteration with `for x in v`, see PR #91.
+function fc_iterate_sum(v)
+    s = zero(eltype(v))
+    for x in v
+        s += x
+    end
+    return s
+end
+
+# Cartesian indexing.
+fc_getindex2(A, i, j) = A[i, j]
+
+# Splatting and destructuring, which need constant propagation through `iterate`, see
+# PR #158.
+function fc_splat()
+    v = FixedSizeVector{Int}(undef, 3)
+    v[1] = 1; v[2] = 2; v[3] = 3
+    return tuple(v...)
+end
+function fc_destructure(x)
+    v = FixedSizeVectorDefault{Float64}(undef, 3)
+    v[1] = x; v[2] = 2x; v[3] = 3x
+    a, b, c = v
+    return a + b + c
+end
+
+# Destructuring with a slurp, which uses the `Base.rest` method of PR #166.
+fc_rest(v) = ((_, r...) = v; r)
+
+# Constant folding through `collect_as`, see issues #71 and #160, and PR #172.
+fc_collect_as_len() = length(collect_as(FixedSizeVector{Int}, (1, 2, 3)))
+fc_collect_as_sum() = sum(collect_as(FixedSizeVectorDefault{Int}, (1, 2, 3)))
+
+# Constant folding of `length` with non-`Int` dimensions, see PR #47.
+fc_len_int32() = fc_len(FixedSizeVector{Float64}(undef, Int32(3)))
+fc_len_mixed() = fc_len(FixedSizeMatrix{Float64}(undef, Int32(3), 0x2))
+
+# `isassigned`, see issue #14 and PR #15.
+fc_isassigned(A, i) = isassigned(A, i)
+
+# `A[:]` (PRs #130 and #161) and the copying constructor (issue #43).
+fc_colon(A) = A[:]
+fc_copy_constructor(A) = FixedSizeArray(A)
+
+# `copy!` into a `FixedSizeVector`, which used to fall back to `resize!`, see issue #194 and
+# PR #195.
+fc_copy!(dst, src) = copy!(dst, src)
+
 # The IR of a build instrumented for code coverage is not representative.
 build_is_production_build &&
 @testset "FileCheck: LLVM IR properties" begin
@@ -232,6 +311,49 @@ build_is_production_build &&
                 @check_not fc_alloc_call
                 @check "ret $fc_int %\"n::Int$(Sys.WORD_SIZE)\""
                 code_llvm(fc_dynamic_len, (Int,); debuginfo=:none)
+            end
+        end
+
+        @testset "out-of-bounds Cartesian indexing (issue #175)" begin
+            # A bounds error capturing the array would force the allocation of its `Memory`.
+            @test @filecheck begin
+                @check "define"
+                @check_not "gcframe"
+                @check_not fc_alloc_call
+                @check "ret double"
+                code_llvm(fc_fill_reduce_2d, (Float64, Int, Int); debuginfo=:none)
+            end
+        end
+
+        @testset "splatting and destructuring are constant-folded (PR #158)" begin
+            @test @filecheck begin
+                @check "define"
+                @check_not "gcframe"
+                @check_not fc_alloc_call
+                @check "store $fc_int 1"
+                @check "store $fc_int 2"
+                @check "store $fc_int 3"
+                @check_not fc_alloc_call
+                @check "ret void"
+                code_llvm(fc_splat, (); debuginfo=:none)
+            end
+            @test @filecheck begin
+                @check "define"
+                @check_not "{{gcframe| call }}"
+                @check "ret double"
+                code_llvm(fc_destructure, (Float64,); debuginfo=:none)
+            end
+        end
+
+        @testset "`collect_as` from a tuple is constant-folded (PR #172)" begin
+            @testset "$(f)" for (f, result) in ((fc_collect_as_len, 3), (fc_collect_as_sum, 6))
+                @test @filecheck begin
+                    @check "define"
+                    @check_not "{{ call |gcframe| br }}"
+                    @check "ret $fc_int $result"
+                    @check_next "}"
+                    code_llvm(f, (); debuginfo=:none)
+                end
             end
         end
     end
@@ -430,6 +552,171 @@ build_is_production_build &&
                 @check "store <{{[0-9]+}} x double>"
                 code_llvm(fill!, (A, Float64); debuginfo=:none)
             end) skip=skipped
+        end
+    end
+
+    @testset "broadcasting does not call `objectid` (issue #63)" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not "object_id"
+            code_llvm(fc_broadcast_scale!, (FixedSizeVectorDefault{Float64}, Float64, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        end
+        @test @filecheck begin
+            @check "define"
+            @check_not "object_id"
+            code_llvm(fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        end
+    end
+
+    fc_run_bounds_check_elision_checks && VERSION >= v"1.13" &&
+    @testset "loops without `@inbounds` are vectorized" begin
+        @testset "stores (issue #70)" begin
+            @test @filecheck begin
+                @check "define"
+                @check_not fc_bounds_error
+                @check "store <{{[0-9]+}} x double>"
+                @check_not fc_bounds_error
+                code_llvm(fc_store_loop!, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+            end
+        end
+        @testset "`@simd ivdep` over `eachindex` of two arrays (issue #152)" begin
+            @test @filecheck begin
+                @check "define"
+                @check_not fc_bounds_error
+                @check "vector.body"
+                @check "<{{[0-9]+}} x double>"
+                @check_not fc_bounds_error
+                code_llvm(fc_simd_ivdep!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}, Float64); debuginfo=:none)
+            end
+        end
+    end
+
+    fc_run_bounds_check_elision_checks &&
+    @testset "loop over `eachindex` of an N-d array: no bounds check, no division (PR #6)" begin
+        # Linear indexing: no conversion of the index to Cartesian indices.
+        @testset "N = $N" for N in 1:3
+            @test @filecheck begin
+                @check "define"
+                @check_not "{{boundserror|bounds_error|sdiv|udiv|srem|urem}}"
+                @check "ret double"
+                code_llvm(fc_sum_loop, (FixedSizeArrayDefault{Float64, N},); debuginfo=:none)
+            end
+        end
+    end
+
+    fc_run_bounds_check_elision_checks &&
+    @testset "`for x in v` has no bounds check and is vectorized (PR #91)" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not fc_bounds_error
+            @check "add <{{[0-9]+}} x i8>"
+            @check_not fc_bounds_error
+            @check "ret i8"
+            code_llvm(fc_iterate_sum, (FixedSizeVectorDefault{Int8},); debuginfo=:none)
+        end
+    end
+
+    # On Julia 1.10 and 1.11 the bounds error is boxed on the heap.
+    fc_run_bounds_check_elision_checks && VERSION >= v"1.12" &&
+    @testset "Cartesian indexing performs exactly one bounds check and no allocation" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not fc_alloc_call
+            @check_count 1 fc_bounds_error
+            @check_not fc_bounds_error
+            @check_not fc_alloc_call
+            code_llvm(fc_getindex2, (FixedSizeMatrixDefault{Float64}, Int, Int); debuginfo=:none)
+        end
+    end
+
+    @testset "splatting does not go through dynamic dispatch (PR #158)" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not "{{apply_iterate|jl_apply_generic|jl_invoke}}"
+            @check "ret"
+            code_llvm(fc_splat, (); debuginfo=:none)
+        end
+    end
+
+    @testset "destructuring with a slurp uses the specialized `Base.rest` (PR #166)" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not "{{_foldl_impl|sizehint}}"
+            code_llvm(fc_rest, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+        end
+    end
+
+    @testset "`length` is constant-folded with non-`Int` dimensions (PR #47)" begin
+        @test @filecheck begin
+            @check "define"
+            @check_next "top:"
+            @check_next "ret $fc_int 3"
+            @check_next "}"
+            code_llvm(fc_len_int32, (); debuginfo=:none)
+        end
+        # Julia 1.10 does not fold the product of mixed integer types.
+        VERSION >= v"1.11" && @test @filecheck begin
+            @check "define"
+            @check_next "top:"
+            @check_next "ret $fc_int 6"
+            @check_next "}"
+            code_llvm(fc_len_mixed, (); debuginfo=:none)
+        end
+    end
+
+    fc_run_bounds_check_elision_checks &&
+    @testset "`isassigned` is a bounds check and a null check (PR #15)" begin
+        # No runtime calls.  Note that Julia 1.10 calls the `llvm.smax` intrinsic.
+        @test @filecheck begin
+            @check "define"
+            @check_not "{{gcframe|jl_|j_}}"
+            @check "icmp ne"
+            @check_not "{{gcframe|jl_|j_}}"
+            @check "ret i8"
+            code_llvm(fc_isassigned, (FixedSizeVectorDefault{String}, Int); debuginfo=:none)
+        end
+    end
+
+    fc_run_copy_checks &&
+    @testset "`A[:]` and the copying constructor are one allocation and a bulk memory copy" begin
+        @testset "$(f) $(T)" for (f, T) in (
+                (fc_colon, FixedSizeVectorDefault{Float64}),
+                (fc_colon, FixedSizeMatrixDefault{Float64}),
+                (fc_copy_constructor, FixedSizeVectorDefault{Float64}),
+            )
+            @test @filecheck begin
+                @check "define"
+                @check_not "{{vector.body|boundserror|bounds_error}}"
+                @check "jl_alloc_genericmemory"
+                @check_not "{{vector.body|boundserror|bounds_error}}"
+                @check "memmove"
+                @check_not "{{vector.body|boundserror|bounds_error}}"
+                @check "ret void"
+                code_llvm(f, (T,); debuginfo=:none)
+            end
+        end
+    end
+
+    # On Julia 1.10 the storage is a `Vector` and the copy happens in a non-inlined call.
+    fc_run_bounds_check_elision_checks && VERSION >= v"1.11" &&
+    @testset "`copyto!` between `FixedSizeArray`s is a bulk memory copy" begin
+        # Inspect `copyto!` directly: in a wrapper the call to it may not be inlined.
+        @test @filecheck begin
+            @check "define"
+            @check_not "vector.body"
+            @check "memmove"
+            @check_not "vector.body"
+            @check "ret"
+            code_llvm(copyto!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        end
+    end
+
+    @testset "`copy!` into a `FixedSizeVector` does not fall back to `resize!` (issue #194)" begin
+        # On Julia 1.12 `copy!` is not inlined, so this does not catch the issue there.
+        @test @filecheck begin
+            @check "define"
+            @check_not "{{apply_generic|methoderror}}"
+            code_llvm(fc_copy!, (FixedSizeVectorDefault{Float64}, Vector{Float64}); debuginfo=:none)
         end
     end
 end
