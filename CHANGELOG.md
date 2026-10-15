@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout, methods and printing as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, `FixedSizeArray{T,N,Mem}` prints as such on all dimensionalities (a 3-dimensional array with the default memory backend used to print as `FixedSizeArrayDefault{T, 3}`), and partially applied types print with their `where` clause, e.g. `FixedSizeArray{Float64, N, Mem} where {N, Mem<:DenseVector{Float64}}` instead of `FixedSizeArray{Float64}`. Cartesian indexing of a `FixedSizeArray` now computes the linear index as a sum of strided terms instead of the Horner form.
+* `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout, methods and printing as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, a `FixedSizeArray` type is still printed through its aliases, with one difference on Julia v1.13 and earlier: a 3-or-more-dimensional array with the default memory backend prints as `FixedSizeArray{T, 3, Memory{T}}` instead of `FixedSizeArrayDefault{T, 3}`. Partially applied types print with their `where` clause, e.g. `FixedSizeArray{Float64, N, Mem} where {N, Mem<:DenseVector{Float64}}` instead of `FixedSizeArray{Float64}`. Cartesian indexing of a `FixedSizeArray` now computes the linear index as a sum of strided terms instead of the Horner form.
 
 ### Fixed
 

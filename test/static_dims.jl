@@ -364,21 +364,31 @@
         @test repr(a) == "[1 3; 2 4]"
         @test sprint(show, MIME"text/plain"(), a) == "2×2 FixedSizeArrayDims{$Int, 2, Tuple{StaticInt{2}, $Int}, Vector{$Int}}:\n 1  3\n 2  4"
         @test sprint(show, typeof(a)) == "FixedSizeArrayDims{$Int, 2, Tuple{StaticInt{2}, $Int}, Vector{$Int}}"
-        # a `FixedSizeArray` is printed with its alias (which has fewer parameters), unless
-        # another alias with fewer parameters matches
+        # A `FixedSizeArray` type is printed through one of the aliases, never as a
+        # `FixedSizeArrayDims`, and the printed form round-trips. Which alias is used depends
+        # on the Julia version: up to v1.13 Julia prints through an alias only if exactly one
+        # matches, and the `make_typealias` method then selects `FixedSizeArray`; later
+        # versions select the alias with the fewest parameters, e.g. `FixedSizeMatrixDefault`.
+        # (Partially applied types with free trailing parameters, e.g. `FixedSizeArray{Float64}`,
+        # are printed with their `where` clause, as for any alias with a bound depending on `T`.)
         for Mem ∈ storage_types
             f = wrap(FixedSizeArray, Mem{Int}(undef, 4), (2, 2))
-            @test sprint(show, typeof(f)) == "FixedSizeArray{$Int, 2, $(Mem{Int})}"
-            @test sprint(show, MIME"text/plain"(), f) == "2×2 FixedSizeArray{$Int, 2, $(Mem{Int})}:\n" * sprint(Base.print_array, f)
-            @test sprint(show, FixedSizeArray{Int, 3, Mem{Int}}) == "FixedSizeArray{$Int, 3, $(Mem{Int})}"
-            @test sprint(show, FixedSizeArray{Int, 0, Mem{Int}}) == "FixedSizeArray{$Int, 0, $(Mem{Int})}"
-            @test sprint(show, Vector{FixedSizeVector{Int, Mem{Int}}}) == "Vector{FixedSizeArray{$Int, 1, $(Mem{Int})}}"
+            for T ∈ (typeof(f), FixedSizeArray{Int, 3, Mem{Int}}, FixedSizeArray{Int, 0, Mem{Int}},
+                     Vector{FixedSizeVector{Int, Mem{Int}}}, FixedSizeArray{T, 2, Mem{T}} where {T},
+                     FixedSizeArray{T, N, Mem{T}} where {T, N})
+                str = sprint(show, T)
+                @test !occursin("FixedSizeArrayDims", str)
+                @test startswith(str, "FixedSize") || startswith(str, "Vector{FixedSize")
+                @test Base.eval(@__MODULE__, Meta.parse(str)) == T
+            end
+            str = sprint(show, MIME"text/plain"(), f)
+            @test !occursin("FixedSizeArrayDims", str)
+            @test startswith(str, "2×2 FixedSize")
+            @test endswith(str, ":\n" * sprint(Base.print_array, f))
+            # without `:compact`, the `struct` is printed, as for `Vector` and `Array`
             @test sprint(show, typeof(f); context = :compact => false) == sprint(show, FixedSizeArrayDims{Int, 2, Tuple{Int, Int}, Mem{Int}}; context = :compact => false)
+            @test occursin("FixedSizeArrayDims", sprint(show, typeof(f); context = :compact => false))
         end
-        @test sprint(show, FixedSizeArray{T, 2, Vector{T}} where {T}) == "FixedSizeArray{T, 2, Vector{T}} where T"
-        @test sprint(show, FixedSizeArray{T, N, Vector{T}} where {T, N}) == "FixedSizeArray{T, N, Vector{T}} where {T, N}"
-        # (partially applied types with free trailing parameters, e.g. `FixedSizeArray{Float64}`,
-        # are printed with their `where` clause, as for any alias with a bound depending on `T`)
         @test sprint(show, FixedSizeArrayDims) == "FixedSizeArrayDims"
         @test sprint(show, FixedSizeArrayDefault) == "FixedSizeArrayDefault"
         @test sprint(show, Union{}) == "Union{}"
