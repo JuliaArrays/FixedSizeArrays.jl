@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout and methods as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, and `FixedSizeArray{T,N}` with an invalid `N` (e.g. `FixedSizeArray{Int,-1}`) now throws an error when the type is formed. The types are printed by `Base`, as other type aliases: up to Julia v1.13 through an alias only if it is the only one matching the type, as a `FixedSizeArrayDims` otherwise, e.g. `FixedSizeArrays.FixedSizeArrayDims{Float64, 1, Tuple{Int64}, Memory{Float64}}` instead of `FixedSizeArray{Float64, 1, Memory{Float64}}`, and since Julia v1.14 through the most specific matching alias, e.g. `FixedSizeVectorDefault{Float64}`.
+* `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout and methods as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, and `FixedSizeArray{T,N}` with an invalid `N` (e.g. `FixedSizeArray{Int,-1}`) now throws an error when the type is formed.
 
 ### Fixed
 

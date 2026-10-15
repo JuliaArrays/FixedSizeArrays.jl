@@ -757,4 +757,3 @@ const FixedSizeVectorDefault = FixedSizeArrayDefault{T, 1} where {T}
 Construct a [`FixedSizeMatrix`](@ref) with element type `T`, and the default memory backend (`Vector{T}` on Julia v1.10, `Memory{T}` on Julia v1.11+).
 """
 const FixedSizeMatrixDefault = FixedSizeArrayDefault{T, 2} where {T}
-
