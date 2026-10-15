@@ -821,7 +821,9 @@ end
 if all(f -> isdefined(Base, f), (:makeproper, :make_wheres, :show_typealias, :show_wheres))
     function Base.show(io::IO, @nospecialize(x::Type{<:FixedSizeArray}))
         properx = Base.makeproper(io, x)
-        if x === Union{} || !(properx <: FixedSizeArray) || !(get(io, :compact, true)::Bool)
+        # (not for `Union{}` and `Union`s of `FixedSizeArray` types, which are `FixedSizeArray`
+        # types too, but have no parameters)
+        if !(Base.unwrap_unionall(properx) isa DataType) || !(properx <: FixedSizeArray) || !(get(io, :compact, true)::Bool)
             return invoke(show, Tuple{IO, Type}, io, x)
         end
         # the aliases themselves are printed by their name, without a `where` clause

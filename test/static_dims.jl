@@ -389,6 +389,16 @@
         end
         @test sprint(show, FixedSizeArrayDims) == "FixedSizeArrayDims"
         @test sprint(show, Union{}) == "Union{}"
+        # `Union`s of `FixedSizeArray` types are `FixedSizeArray` types too: printed by `Base`
+        for U ∈ (
+            Union{FixedSizeVector{Int, Vector{Int}}, FixedSizeMatrix{Int, Vector{Int}}},
+            Union{FixedSizeVector{Float64}, FixedSizeMatrix{Float64}},
+            Union{Nothing, FixedSizeVector{Float64}},
+        )
+            str = sprint(show, U)
+            @test startswith(str, "Union{")
+            @test Base.eval(@__MODULE__, Meta.parse(str)) == U
+        end
     end
 
     @testset "StaticArrayInterface" begin
