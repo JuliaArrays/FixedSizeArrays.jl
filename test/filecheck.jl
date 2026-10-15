@@ -24,8 +24,10 @@ const fc_run_reshape_throw_checks = VERSION >= v"1.14-DEV"
 const fc_run_bounds_check_elision_checks = Base.JLOptions().check_bounds != 1
 # https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200: since Julia 1.13 (which
 # dropped `@inbounds` from the generic `fill!`) LLVM does not elide the bounds check in
-# `fill!` for `FixedSizeArray`s and their views, and so does not vectorize the loop.
-const fc_fill_bounds_check_skipped = VERSION >= v"1.13"
+# `fill!` for views of `FixedSizeArray`s, and so does not vectorize the loop.
+# `FixedSizeArray`s themselves have a `fill!` method of their own, which does not have
+# this problem.  (`v"1.13-"` to include the prereleases of v1.13.)
+const fc_fill_view_bounds_check_skipped = VERSION >= v"1.13-"
 
 # Before Julia 1.13 `copy` went through a loop with a bounds check and two allocations.
 const fc_run_copy_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.13"
@@ -92,6 +94,12 @@ const fc_fill_view = typeof(view(fc_fill_array(undef, 1, 1, 1, 1, 1), :, :, :, :
 # Scalar indexing.
 fc_getindex(A, i) = A[i]
 fc_setindex!(A, i, x) = (A[i] = x; nothing)
+
+# Cartesian indexing of a `StaticSizeArray`.
+const fc_static_size_array = StaticSizeArray{Float64, 3, Tuple{StaticInt{5}, StaticInt{4}, Int}, FixedSizeArrays.default_underlying_storage_type{Float64}}
+fc_getindex(A, i, j, k) = A[i, j, k]
+fc_getindex_inbounds(A, i, j, k) = @inbounds A[i, j, k]
+fc_setindex_inbounds!(A, i, j, k, x) = (@inbounds A[i, j, k] = x; nothing)
 
 # Loop over `eachindex`.
 function fc_sum_loop(A)
@@ -311,6 +319,40 @@ build_is_production_build &&
         end
     end
 
+    fc_run_bounds_check_elision_checks && VERSION >= v"1.11" &&
+    @testset "Cartesian indexing of a `StaticSizeArray`" begin
+        @testset "one bounds check" begin
+            @test @filecheck begin
+                @check "define"
+                @check_count 1 fc_bounds_error
+                @check_not fc_bounds_error
+                code_llvm(fc_getindex, (fc_static_size_array, Int, Int, Int); debuginfo=:none)
+            end
+        end
+        # The static sizes are constants (e.g. the multiplication by the first size), and the
+        # size in the last dimension is not loaded.
+        @testset "`@inbounds`: no bounds check, static sizes" begin
+            @test @filecheck begin
+                @check "define"
+                @check_not "{{bounds_error|boundserror|load i64}}"
+                @check "mul i64 {{.*}}, 5"
+                @check_not "{{bounds_error|boundserror|load i64}}"
+                @check "load double"
+                @check_not "{{bounds_error|boundserror|load i64}}"
+                @check "ret double"
+                code_llvm(fc_getindex_inbounds, (fc_static_size_array, Int, Int, Int); debuginfo=:none)
+            end
+            @test @filecheck begin
+                @check "define"
+                @check_not fc_bounds_error
+                @check "store double"
+                @check_not fc_bounds_error
+                @check "ret void"
+                code_llvm(fc_setindex_inbounds!, (fc_static_size_array, Int, Int, Int, Float64); debuginfo=:none)
+            end
+        end
+    end
+
     fc_run_bounds_check_elision_checks &&
     @testset "loop over `eachindex` has no bounds check" begin
         @test @filecheck begin
@@ -333,6 +375,16 @@ build_is_production_build &&
             @check "ret void"
             code_llvm(fc_broadcast!, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
         end
+        @test @filecheck begin
+            @check "define"
+            @check_not fc_alloc_call
+            @check_not fc_bounds_error
+            @check "fadd <{{[0-9]+}} x double>"
+            @check_not fc_alloc_call
+            @check_not fc_bounds_error
+            @check "ret void"
+            code_llvm(fc_broadcast!, (fc_static_size_array,); debuginfo=:none)
+        end
     end
 
     fc_run_copy_checks &&
@@ -351,15 +403,19 @@ build_is_production_build &&
 
     fc_run_bounds_check_elision_checks &&
     @testset "`fill!` elides the bounds check and vectorizes (issue #200)" begin
-        # Do not print the FileCheck diagnostic while the test is known to be broken.
-        dump_input = fc_fill_bounds_check_skipped ? "never" : "fail"
-        @testset "$(name)" for (name, A) in (("array", fc_fill_array), ("view", fc_fill_view))
+        @testset "$(name)" for (name, A, skipped) in (
+            ("array", fc_fill_array, false),
+            ("StaticSizeArray", fc_static_size_array, false),
+            ("view", fc_fill_view, fc_fill_view_bounds_check_skipped),
+        )
+            # Do not print the FileCheck diagnostic while the test is known to be broken.
+            dump_input = skipped ? "never" : "fail"
             @test (@filecheck dump_input=dump_input begin
                 @check "define"
                 @check_not "{{boundserror|bounds_error}}"
                 @check "store <{{[0-9]+}} x double>"
                 code_llvm(fill!, (A, Float64); debuginfo=:none)
-            end) skip=fc_fill_bounds_check_skipped
+            end) skip=skipped
         end
     end
 end
