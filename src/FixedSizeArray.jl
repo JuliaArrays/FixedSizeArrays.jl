@@ -790,6 +790,8 @@ const printing_aliases = (
 function alias_parameters(@nospecialize(x::Type), @nospecialize(alias::UnionAll))
     x <: alias || return nothing
     (_, env) = ccall(:jl_type_intersection_with_env, Any, (Any, Any), x, alias)::Core.SimpleVector
+    # (since Julia v1.14, a constrained type variable is marked as `svec(tvar, constrained)`)
+    env = Core.svec(Any[e isa Core.SimpleVector ? e[1] : e for e in env]...)
     applied = try
         alias{env...}
     catch ex
@@ -797,7 +799,7 @@ function alias_parameters(@nospecialize(x::Type), @nospecialize(alias::UnionAll)
         return nothing
     end
     applied = Base.rewrap_unionall(applied, x)
-    (!Base.has_free_typevars(applied) && applied === x) ? env : nothing
+    (!Base.has_free_typevars(applied) && applied == x) ? env : nothing
 end
 
 # The alias to print `x` with, and its parameters.
@@ -819,6 +821,16 @@ function fixed_size_array_parameters(@nospecialize(x::Type{<:FixedSizeArray}))
 end
 
 if all(f -> isdefined(Base, f), (:make_wheres, :show_typealias, :show_wheres))
+    # `Base.show_typealias` has the type as third argument up to Julia v1.13, not later.
+    const show_typealias_has_type_argument = hasmethod(Base.show_typealias, Tuple{IO, GlobalRef, Type, Core.SimpleVector, Vector})
+    function show_typealias(io::IO, name::GlobalRef, @nospecialize(x::Type), env::Core.SimpleVector, wheres::Vector{TypeVar})
+        if show_typealias_has_type_argument
+            Base.show_typealias(io, name, x, env, wheres)
+        else
+            Base.show_typealias(io, name, env, wheres)
+        end
+    end
+
     function Base.show(io::IO, @nospecialize(x::Type{<:FixedSizeArray}))
         # Not for `Union{}` and `Union`s of `FixedSizeArray` types (`FixedSizeArray` types too,
         # but without parameters), nor for types with free type variables, as in the method
@@ -834,12 +846,12 @@ if all(f -> isdefined(Base, f), (:make_wheres, :show_typealias, :show_wheres))
         # the aliases themselves are printed by their name, without a `where` clause
         for name ∈ (:FixedSizeArray, printing_aliases...)
             if x === getfield(@__MODULE__, name)
-                return Base.show_typealias(io, GlobalRef(@__MODULE__, name), x, Core.svec(), TypeVar[])
+                return show_typealias(io, GlobalRef(@__MODULE__, name), x, Core.svec(), TypeVar[])
             end
         end
         (name, env) = printing_alias(x)
         wheres = Base.make_wheres(io, env, x)
-        Base.show_typealias(io, name, x, env, wheres)
+        show_typealias(io, name, x, env, wheres)
         Base.show_wheres(io, wheres)
     end
 end
