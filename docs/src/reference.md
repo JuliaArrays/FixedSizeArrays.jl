@@ -28,4 +28,5 @@ This section gathers documentation of internal functionalities of `FixedSizeArra
 ```@docs
 FixedSizeArrays.with_stripped_type_parameters
 FixedSizeArrays.with_stripped_type_parameters_unchecked
+FixedSizeArrays.underlying_storage
 ```
