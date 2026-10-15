@@ -75,6 +75,12 @@ fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
         end
         # `Integer`s are converted to `Int`s
         @test FixedSizeArrays.static_dims(wrap(FixedSizeArrayDims, p, (static(2), Int8(3), UInt(4)))) === (static(2), 3, 4)
+        S8 = FixedSizeArrayDims{Float64, 3, Tuple{StaticInt{2}, StaticInt{3}, Int}, Mem{Float64}}
+        @test FixedSizeArrays.static_dims(wrap(S8, p, (Int8(2), UInt(3), Int16(4)))) === (static(2), static(3), 4)
+        @test FixedSizeArrays.static_dims(wrap(S8, p, (Int8(2), :, Int16(4)))) === (static(2), static(3), 4)
+        @test FixedSizeArrays.static_dims(S8(undef, (Int8(2), UInt(3), Int16(4)))) === (static(2), static(3), 4)
+        @test FixedSizeArrays.static_dims(S8(undef, Int8(2), UInt(3), Int16(4))) === (static(2), static(3), 4)
+        @test_throws DimensionMismatch wrap(S8, p, (Int8(3), UInt(2), Int16(4)))
         # a `Colon` is computed from the length of the parent
         @test FixedSizeArrays.static_dims(wrap(FixedSizeArrayDims, p, (static(2), :, static(4)))) === (static(2), 3, static(4))
         @test FixedSizeArrays.static_dims(wrap(FixedSizeArrayDims, p, (static(2), static(3), :))) === (static(2), static(3), 4)
