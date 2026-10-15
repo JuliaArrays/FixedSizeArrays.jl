@@ -172,6 +172,37 @@ Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::F
     return A
 end
 
+# Cartesian indexing: compute the linear index in Horner form,
+#     l = 1 + (i1 - 1) + s1 * ((i2 - 1) + s2 * ((i3 - 1) + ...)),
+# as StrideArraysCore.jl does for dense arrays, instead of the forward sum with stride
+# products used by Base, `1 + (i1 - 1) + (i2 - 1) * s1 + (i3 - 1) * (s1 * s2) + ...`.
+# Both give the same value. With the Horner form, all elements that differ only in the
+# first index share the nested part `s1 * (...)` of the offset, so a kernel accessing
+# several of them, e.g. all variables `u[v, i, j, k, element]` of a node, needs one base
+# offset plus constant offsets. With the forward sum, LLVM reassociates the sum differently
+# per element and computes a separate offset for each one, which costs instructions and
+# registers.
+@inline horner_offset(::Tuple{Int}, I::Tuple{Int}) = I[1] - 1
+@inline horner_offset(s::Tuple{Int,Int,Vararg{Int}}, I::Tuple{Int,Int,Vararg{Int}}) =
+    (I[1] - 1) + s[1] * horner_offset(Base.tail(s), Base.tail(I))
+Base.@propagate_inbounds function Base.getindex(A::FixedSizeArray{<:Any,N}, i1::Int, i2::Int, I::Vararg{Int}) where {N}
+    if N == length(I) + 2
+        @boundscheck checkbounds(A, i1, i2, I...)
+        @inbounds A[horner_offset(size(A), (i1, i2, I...)) + 1]
+    else
+        invoke(getindex, Tuple{AbstractArray, Vararg{Any}}, A, i1, i2, I...)
+    end
+end
+Base.@propagate_inbounds @assume_noub_if_noinbounds function Base.setindex!(A::FixedSizeArray{<:Any,N}, x, i1::Int, i2::Int, I::Vararg{Int}) where {N}
+    if N == length(I) + 2
+        @boundscheck checkbounds(A, i1, i2, I...)
+        @inbounds A[horner_offset(size(A), (i1, i2, I...)) + 1] = x
+        A
+    else
+        invoke(setindex!, Tuple{AbstractArray, Any, Vararg{Any}}, A, x, i1, i2, I...)
+    end
+end
+
 function Base.checkbounds(A::FixedSizeArray, is...)
     checkbounds_lightboundserror(A, is...)
 end
