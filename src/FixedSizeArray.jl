@@ -203,20 +203,6 @@ to_static_dim(::Colon) = throw(ArgumentError("a `Colon` dimension is only suppor
 
 Base.size(a::FixedSizeArrayDims) = map(dim_value, static_dims(a))
 
-# a method of our own, so that e.g. `size(a, 1)` is a compile-time constant for a static
-# dimension (from `known_dims(D)`, a tuple of constants, as indexing the dimensions
-# themselves with a `d` known only at runtime would box them)
-Base.@constprop :aggressive function Base.size(a::FixedSizeArrayDims{<:Any, N, D}, d::Integer) where {N, D}
-    if d < 1
-        throw(ArgumentError("dimension out of range"))
-    elseif d ≤ N
-        k = known_dims(D)[d]
-        (k === nothing) ? size(a)[d] : k
-    else
-        1
-    end
-end
-
 parent_type(::Type{<:FixedSizeArrayDims{<:Any,<:Any,<:Any,Mem}}) where {Mem} = Mem
 
 # The memory backend of `FSA`, the default memory backend if it is not given.

@@ -245,14 +245,17 @@ fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
         @test size(a) === (5, 4, 4, 7)
         test_inferred_noalloc(size, NTuple{4, Int}, (a,))
         @test Base.return_types(a -> Val(size(a)[1:3]), (T,)) == [Val{(5, 4, 4)}]
-        @test Base.return_types(a -> Val(size(a, 2)), (T,)) == [Val{4}]
+        # (`size(a, d)` is the generic method of `Base`: LLVM folds it to a constant in a
+        # static dimension, see the FileCheck tests, but inference does not)
+        @test size(a, 2) == 4
+        test_inferred_noalloc(size, Int, (a, 2))
         @test Base.return_types(a -> Val(size(a, 5)), (T,)) == [Val{1}]
         @test Base.return_types(a -> Val(strides(a)), (T,)) == [Val{(1, 5, 20, 80)}]
         @test Base.return_types(a -> Val(stride(a, 4)), (T,)) == [Val{80}]
         @test Base.return_types(a -> Val(ndims(a)), (T,)) == [Val{4}]
         @test size(a, 4) == 7
         @test size(a, 5) == 1
-        @test_throws ArgumentError size(a, 0)
+        @test_throws BoundsError size(a, 0)
         @test length(a) == 560
         @test strides(a) === (1, 5, 20, 80)
         # static dimensions after a dynamic one
@@ -260,8 +263,7 @@ fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
         M = typeof(m)
         @test size(m) === (3, 4, 2, 5)
         @test strides(m) === (1, 3, 12, 24)
-        @test Base.return_types(a -> Val(size(a, 2)), (M,)) == [Val{4}]
-        @test Base.return_types(a -> Val(size(a, 4)), (M,)) == [Val{5}]
+        @test size(m, 2) == 4 && size(m, 4) == 5
         @test Base.return_types(a -> Val(stride(a, 2)), (M,)) == [Val]
         # the static dimensions take no space
         @test sizeof(T) == sizeof(FixedSizeVectorDefault{Float64})
@@ -280,7 +282,7 @@ fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
         # all dimensions dynamic: `size(a, d)` with an `Int` dimension
         f = FixedSizeArray{Float64}(undef, 3, 4)
         @test size(f, 1) == 3 && size(f, 2) == 4 && size(f, 3) == 1
-        @test_throws ArgumentError size(f, 0)
+        @test_throws BoundsError size(f, 0)
         @test Base.return_types(a -> Val(size(a, 3)), (typeof(f),)) == [Val{1}]
         test_inferred_noalloc(size, Int, (f, 1))
     end
