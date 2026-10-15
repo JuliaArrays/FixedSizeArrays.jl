@@ -6,15 +6,18 @@ module FixedSizeArraysStaticArrayInterfaceExt
 # `DenseArray`s.
 
 using StaticArrayInterface: StaticArrayInterface
-using Static: known
-using FixedSizeArrays: FixedOrStaticSizeArray, StaticSizeArray, parent_type, static_dims, static_strides
+using Static: StaticInt
+using FixedSizeArrays: FixedOrStaticSizeArray, StaticSizeArray, known_dims, parent_type, static_dims
 
 StaticArrayInterface.static_size(a::StaticSizeArray) = static_dims(a)
 
-StaticArrayInterface.static_strides(a::StaticSizeArray) = static_strides(static_dims(a))
+# The stride in a dimension is a `StaticInt` if all the dimensions before it are static.
+function StaticArrayInterface.static_strides(a::StaticSizeArray)
+    Base.front(accumulate(*, (StaticInt(1), static_dims(a)...)))
+end
 
 function StaticArrayInterface.known_size(::Type{<:StaticSizeArray{<:Any, <:Any, D}}) where {D}
-    known(D)
+    known_dims(D)
 end
 
 function StaticArrayInterface.known_strides(::Type{<:StaticSizeArray{<:Any, <:Any, D}}) where {D}
@@ -23,7 +26,7 @@ end
 
 # The strides known from the dimensions of type `D`, with `nothing` for the others.
 @generated function known_strides(::Type{D}) where {D <: Tuple}
-    ks = known(D)
+    ks = known_dims(D)
     isempty(ks) && return ()
     Tuple(accumulate((s, k) -> (s === nothing || k === nothing) ? nothing : s * k, (1, Base.front(ks)...)))
 end

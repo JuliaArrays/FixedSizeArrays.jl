@@ -5,28 +5,20 @@ Return the dimensions of `a`, a tuple of `StaticInt`s and `Int`s.
 """
 static_dims(a::StaticSizeArray) = getfield(a, :dims)
 
-# `Integer`s as `Int`s, `StaticInt`s and `Colon`s as they are
-to_static_dim(d::Union{StaticInt, Colon}) = d
+# `Integer`s as `Int`s, `Colon`s (and `StaticInt`s, in the Static.jl extension) as they are
+to_static_dim(d::Colon) = d
 to_static_dim(d::Integer) = Int(d)::Int
 
-"""
-    static_strides(dims::Tuple)::Tuple
-
-Return the column-major strides for the dimensions `dims`, a tuple of `StaticInt`s and `Int`s.
-The stride in a dimension is a `StaticInt` if all the dimensions before it are static.
-"""
-static_strides(dims::Tuple) = Base.front(accumulate(*, (StaticInt(1), dims...)))
-
-Base.size(a::StaticSizeArray) = map(dynamic, static_dims(a))
+Base.size(a::StaticSizeArray) = map(dim_value, static_dims(a))
 
 # a method of our own, so that e.g. `size(a, 1)` is a compile-time constant for a static
-# dimension (from `known(D)`, a tuple of constants, as indexing the dimensions themselves
-# with a `d` known only at runtime would box them)
+# dimension (from `known_dims(D)`, a tuple of constants, as indexing the dimensions
+# themselves with a `d` known only at runtime would box them)
 Base.@constprop :aggressive function Base.size(a::StaticSizeArray{<:Any, N, D}, d::Integer) where {N, D}
     if d < 1
         throw(ArgumentError("dimension out of range"))
     elseif d ≤ N
-        k = known(D)[d]
+        k = known_dims(D)[d]
         (k === nothing) ? size(a)[d] : k
     else
         1
@@ -45,13 +37,13 @@ function check_static_size_type(::Type{SA}, a::StaticSizeArray) where {SA <: Sta
 end
 
 # Replace a `Colon` in `dims` by the size computed from `len`.
-resolve_colon(dims::MixedDims, len::Int) = dims
 function resolve_colon(dims::Tuple, len::Int)
+    any(d -> d isa Colon, dims) || return dims
     others = filter(d -> !(d isa Colon), dims)
     if length(others) != length(dims) - 1
         throw(ArgumentError(lazy"at most one dimension can be a `Colon`, got $dims"))
     end
-    m = checked_dims(map(dynamic, others))
+    m = checked_dims(map(dim_value, others))
     if iszero(m)
         throw(ArgumentError(lazy"can not compute the size of the `Colon` dimension from the length of the parent for the dimensions $dims"))
     end
@@ -93,9 +85,9 @@ julia> size(FixedSizeArrays.wrap(StaticSizeArray, resize!(v, 18), (static(2), st
 (2, 3, 3)
 ```
 """
-function wrap(::Type{SA}, parent::DenseVector, dims::Tuple{Vararg{Union{Integer, StaticInt, Colon}}}) where {SA <: StaticSizeArray}
+function wrap(::Type{SA}, parent::DenseVector, dims::Tuple) where {SA <: StaticSizeArray}
     d = resolve_colon(map(to_static_dim, dims), length(parent))
-    len = checked_dims(map(dynamic, d))
+    len = checked_dims(map(dim_value, d))
     if length(parent) != len
         throw(DimensionMismatch(lazy"length of the parent ($(length(parent))) does not match the product of the dimensions $d"))
     end
@@ -121,22 +113,17 @@ function convert_dims(::Type{D}, dims::Tuple) where {D <: Tuple}
     map(convert_dim, fieldtypes(D), dims)
 end
 
-convert_dim(::Type{Int}, d) = Int(dynamic(d))::Int
-function convert_dim(::Type{StaticInt{n}}, d) where {n}
-    if dynamic(d) != n
-        throw(DimensionMismatch(lazy"the dimension $d does not match the static dimension $n"))
-    end
-    StaticInt(n)
-end
+# (static dimensions: in the Static.jl extension)
+convert_dim(::Type{Int}, d) = Int(dim_value(to_static_dim(d)))::Int
 
-function (::Type{SA})(::UndefInitializer, dims::Tuple{Vararg{Union{Integer, StaticInt}}}) where {T, SA <: StaticSizeArray{T}}
+function (::Type{SA})(::UndefInitializer, dims::Tuple) where {T, SA <: StaticSizeArray{T}}
     d = convert_dims(dims_type(SA), dims)
-    mem = parent_type_with_default(SA)(undef, checked_dims(map(dynamic, d)))
+    mem = parent_type_with_default(SA)(undef, checked_dims(map(dim_value, d)))
     check_static_size_type(SA, new_static_size_array(mem, d))
 end
 
-function StaticSizeArray(a::FixedSizeArray, dims::Tuple{Vararg{Union{Integer, StaticInt}}})
-    if size(a) != map(dynamic, dims)
+function StaticSizeArray(a::FixedSizeArray, dims::Tuple)
+    if size(a) != map(dim_value ∘ to_static_dim, dims)
         throw(DimensionMismatch(lazy"the size of the array $(size(a)) does not match the dimensions $dims"))
     end
     new_static_size_array(parent(a), map(to_static_dim, dims))
@@ -151,7 +138,7 @@ end
 # of indices that don't change in a loop can be hoisted out of it if the dimensions are
 # dynamic.)
 function static_size_linear_index(dims::Tuple{Vararg{Any, N}}, inds::NTuple{N, Int}) where {N}
-    terms = map((s, i) -> dynamic(s) * (i - 1), static_strides(dims), inds)
+    terms = map((s, i) -> s * (i - 1), Base.size_to_strides(1, map(dim_value, dims)...), inds)
     +(1, terms...)
 end
 
@@ -187,7 +174,7 @@ end
 # strided arrays interface (`elsize`, `cconvert` and `unsafe_convert`: shared with
 # `FixedSizeArray`s)
 
-Base.strides(a::StaticSizeArray) = map(dynamic, static_strides(static_dims(a)))
+Base.strides(a::StaticSizeArray) = Base.size_to_strides(1, size(a)...)
 
 # `similar`: a `StaticSizeArray` with the same dimensions without a size, a `FixedSizeArray`
 # with a size (deciding by the value of the size would not be type-stable, e.g. for range

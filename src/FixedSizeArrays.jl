@@ -4,7 +4,6 @@ using CheckedSizeProduct: checked_size_product
 using Collects: Collect, collect_as
 using LightBoundsErrors: checkbounds_lightboundserror
 using LightBoundsErrors: LightBoundsError as BoundsErrorLight
-using Static: StaticInt, dynamic, known
 
 const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
 

@@ -85,6 +85,7 @@ With a plain `Array` or `FixedSizeArray` the compiler knows none of these sizes,
 
 For such arrays, the package provides the public (but not exported) type [`FixedSizeArrays.StaticSizeArray`](@ref), whose dimensions are a tuple of `Int`s and `StaticInt`s from [Static.jl](https://github.com/SciML/Static.jl).
 Any dimension can be static or dynamic.
+Static.jl is a weak dependency of FixedSizeArrays.jl, so it is only loaded, and static dimensions are only available, once you load it yourself, e.g. with `using Static: static`.
 The static ones are part of the type, and take no space in the array, so the compiler can compute the sizes in these dimensions, and the strides and linear indices involving them, at compile time:
 
 ```jldoctest

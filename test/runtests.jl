@@ -1040,8 +1040,6 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
             @test Base.return_types(a -> Val(size(a, 2)), (M,)) == [Val{4}]
             @test Base.return_types(a -> Val(size(a, 4)), (M,)) == [Val{5}]
             @test Base.return_types(a -> Val(stride(a, 2)), (M,)) == [Val]
-            @test FixedSizeArrays.static_strides(FixedSizeArrays.static_dims(m)) === (static(1), 3, 12, 24)
-            @test FixedSizeArrays.static_strides(FixedSizeArrays.static_dims(a)) === (static(1), static(5), static(20), static(80))
             # the static dimensions take no space
             @test sizeof(T) == sizeof(FixedSizeVectorDefault{Float64})
             @test sizeof(M) == sizeof(FixedSizeArrayDefault{Float64, 2})

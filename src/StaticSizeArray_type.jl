@@ -1,6 +1,15 @@
-# Dimensions of a `StaticSizeArray`: each one is either a `StaticInt`, a compile-time
-# constant which takes no space, or an `Int`, e.g. `Tuple{StaticInt{4}, Int}` for `(4, n)`.
-const MixedDims{N} = NTuple{N, Union{Int, StaticInt}}
+# Dimensions of a `StaticSizeArray`: each one is either static, a compile-time constant
+# which takes no space, or an `Int`, e.g. `Tuple{StaticInt{4}, Int}` for `(4, n)`. Static
+# dimensions are `StaticInt`s from Static.jl, which is a weak dependency: the methods for
+# them are in the package extension `FixedSizeArraysStaticExt`, while `src` only uses these
+# functions.
+
+# The value of a dimension.
+dim_value(d::Int) = d
+
+# The value of a dimension of type `D` if it is static, `nothing` otherwise.
+known_dim(::Type{Int}) = nothing
+known_dims(::Type{D}) where {D <: Tuple} = map(known_dim, fieldtypes(D))
 
 """
     StaticSizeArray{T,N,D,Mem<:DenseVector{T}} <: DenseArray{T,N}
@@ -11,7 +20,8 @@ from [Static.jl](https://github.com/SciML/Static.jl). Each dimension can be stat
 compile-time constant which is part of the type `D` and takes no space in the array, or
 dynamic, i.e. an `Int` stored in the array. E.g. with `dims = (static(5), static(4), n)`,
 `D = Tuple{StaticInt{5}, StaticInt{4}, Int}`, the array has size `(5, 4, n)`, and `n` can be
-different for different arrays of the same type.
+different for different arrays of the same type. Static.jl is a weak dependency: load it
+(e.g. with `using Static: static`) to use static dimensions.
 
 The static dimensions allow the compiler to compute the linear indices, the strides, and
 the sizes in these dimensions at compile time, which is useful e.g. for arrays where some
@@ -55,11 +65,11 @@ true
 ```
 """
 # (`D` has no bound in the type, so that e.g. `StaticSizeArray{T, N, D, Mem} where {D}` is a
-# `StaticSizeArray`; the inner constructor only accepts dimensions of type `MixedDims{N}`.)
+# `StaticSizeArray`; the inner constructor only accepts `N` dimensions.)
 struct StaticSizeArray{T,N,D,Mem<:DenseVector{T}} <: DenseArray{T,N}
     mem::Mem
     dims::D
-    global function new_static_size_array(mem::DenseVector{T}, dims::MixedDims{N}) where {T,N}
+    global function new_static_size_array(mem::DenseVector{T}, dims::Tuple{Vararg{Any, N}}) where {T,N}
         new{T,N,typeof(dims),typeof(mem)}(mem, dims)
     end
 end
