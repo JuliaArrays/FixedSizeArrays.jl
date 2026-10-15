@@ -10,7 +10,7 @@ fsa_show_3(::FixedSizeArray) = nothing
 fsa_show_4(::FixedSizeArrayDims{T, N, D, Mem}) where {T, N, D, Mem} = nothing
 fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
 
-@testset verbose=true "`FixedSizeArrayDims`: static dimensions" begin
+@testset "`FixedSizeArrayDims`: static dimensions" begin
     # dimensions `(2, 3, 4)` with all combinations of static and dynamic dimensions
     dims_variants = (
         (static(2), static(3), 4), (static(2), static(3), static(4)), (2, static(3), static(4)),
