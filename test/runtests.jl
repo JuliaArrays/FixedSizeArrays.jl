@@ -1,11 +1,16 @@
 using Test
 using LinearAlgebra, Adapt, MPI
 using FixedSizeArrays
-using FixedSizeArrays: checked_dims, wrap
+using FixedSizeArrays: checked_dims, wrap, FixedSizeArrayDims
 using Collects: collect_as
 using OffsetArrays: OffsetArray
 using Random: Random
+using StaticArrayInterface: StaticArrayInterface
+using Static: static, StaticInt
 import Aqua
+
+# The memory backends to test with.
+const storage_types = (FixedSizeArrays.optional_memory..., Vector)
 
 # Check if the compilation options allow maximum performance.
 const build_is_production_build_env_name = "BUILD_IS_PRODUCTION_BUILD"
@@ -248,7 +253,7 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
     include("filecheck.jl")
 
     @testset verbose=true "test sets for multiple supported storage types" begin
-        for storage_type ∈ (((@isdefined Memory) ? (Memory,) : ())..., Vector)
+        for storage_type ∈ storage_types
             FSV = fsv(storage_type)
             FSM = fsm(storage_type)
             FSA = fsa(storage_type)
@@ -778,7 +783,7 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                         @test_throws ArgumentError collect_as(T, iterator)
                     end
                 end
-                @test_throws DimensionMismatch collect_as(FSA{Int, -1}, 7:8)
+                @test_throws ErrorException FSA{Int, -1}  # the dimensions type `NTuple{-1, Int}` can not be constructed
                 @test_throws TypeError collect_as(FSA{Int, 3.1}, 7:8)
                 for T ∈ (FSA{3}, FSV{3})
                     iterator = (7:8, (7, 8))
@@ -843,6 +848,8 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         end
     end
 
+    include("static_dims.jl")
+
     @testset "Random" begin
         for T in (Float16, Float32, Float64),
             N in (4, 16, 64, 128, 256),
@@ -868,6 +875,20 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         farr = adapt(FixedSizeArray, arr)
         @test farr isa Transpose
         @test parent(farr) isa FixedSizeArray
+        # A `FixedSizeArray` with a CPU memory backend is converted as a whole
+        a = FixedSizeArray([1.0 2.0; 3.0 4.0])
+        @test adapt(Array, a) isa Matrix{Float64}
+        @test adapt(Array, a) == a
+        # An array with static dimensions is rewrapped, independently of the memory backend
+        s = wrap(FixedSizeArrayDims, [1.0, 2.0, 3.0, 4.0], (static(2), 2))
+        @test adapt(Array, s) isa FixedSizeArrayDims{Float64, 2, Tuple{StaticInt{2}, Int}, Vector{Float64}}
+        @test adapt(Array, s) == s
+        # but converted to a `FixedSizeArray` as a whole
+        f = adapt(FixedSizeArray, s)
+        @test f isa FixedSizeArray{Float64, 2}
+        @test f == s
+        @test parent(f) !== parent(s)
+        @test adapt(FixedSizeArray, transpose(s)) isa Transpose{Float64, <:FixedSizeArray}
     end
 
 
@@ -877,7 +898,6 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         rank = MPI.Comm_rank(comm)
         nranks = MPI.Comm_size(comm)
         root = 0
-        storage_types = (((@isdefined Memory) ? (Memory,) : ())..., Vector)
         @testset "$Mem, $T, $sz" for Mem in storage_types,
                                      T in (Float64, Int, ComplexF64, MPITestStruct),
                                      sz in ((6,), (2, 3), (2, 3, 4))
@@ -1008,6 +1028,29 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                     @test view(c, 2:size(c, 1), ntuple(Returns(:), N - 1)...) ==
                           view(a, 2:size(a, 1), ntuple(Returns(:), N - 1)...)
                 end
+            end
+        end
+
+        @testset "static dimensions" begin
+            for Mem ∈ storage_types
+                a = FixedSizeArrayDims{Float64, 3, Tuple{StaticInt{2}, StaticInt{3}, Int}, Mem{Float64}}(undef, (static(2), static(3), 4))
+                vec(a) .= 10 * rank .+ (1:24)
+                buf = MPI.Buffer(a)
+                @test buf isa MPI.Buffer{typeof(a)}
+                @test buf.data === a
+                @test buf.count == 24
+                @test buf.datatype == MPI.Datatype(Float64)
+                c = Base.cconvert(MPI.MPIPtr, a)
+                GC.@preserve c begin
+                    @test reinterpret(Ptr{Float64}, Base.unsafe_convert(MPI.MPIPtr, c)) == pointer(a)
+                end
+                b = similar(a)
+                rreq = MPI.Irecv!(b, comm; source = rank, tag = 6)
+                sreq = MPI.Isend(a, comm; dest = rank, tag = 6)
+                MPI.Waitall([rreq, sreq])
+                @test b == a
+                MPI.Allreduce!(a, b, +, comm)
+                @test vec(b) == sum(r -> 10 * r .+ (1:24), 0:(nranks - 1))
             end
         end
 
