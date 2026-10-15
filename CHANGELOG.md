@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout, methods and printing as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, and `FixedSizeArray{T,N}` with an invalid `N` (e.g. `FixedSizeArray{Int,-1}`) now throws an error when the type is formed. The aliases themselves are now printed by their name, e.g. `FixedSizeVector` instead of `FixedSizeVector{T} where T`. In the signatures printed by `methods` and in `MethodError`s, a `FixedSizeArray{T,N,Mem}` whose type variables do not repeat the bound `Mem<:DenseVector{T}` (e.g. `f(::FixedSizeArray{T,N,Mem}) where {T,N,Mem}`) is printed as a `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`.
+* `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout, methods and printing as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, and `FixedSizeArray{T,N}` with an invalid `N` (e.g. `FixedSizeArray{Int,-1}`) now throws an error when the type is formed. The aliases themselves are now printed by their name, e.g. `FixedSizeVector` instead of `FixedSizeVector{T} where T`.
 
 ### Fixed
 
