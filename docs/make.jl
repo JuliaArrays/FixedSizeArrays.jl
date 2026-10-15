@@ -1,4 +1,5 @@
 using Documenter: Documenter, makedocs, deploydocs
+using DocumenterCodeBlocks: CodeBlocks
 using FixedSizeArrays
 using Changelog: Changelog
 
@@ -16,6 +17,9 @@ Changelog.generate(
 makedocs(
     modules = [FixedSizeArrays],
     sitename = "FixedSizeArrays",
+    plugins = [
+        CodeBlocks(; line_counter=:named),
+    ],
     pages    = [
         "Introduction" => "index.md",
         "Installation" => "installation.md",

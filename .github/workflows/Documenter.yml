@@ -46,3 +46,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+      - name: "Upload docs build as artifact"
+        uses: actions/upload-artifact@v7
+        with:
+          name: documentation-build
+          path: docs/build
+          retention-days: 30
