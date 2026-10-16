@@ -33,8 +33,10 @@ known_dims(::Type{D}) where {D <: Tuple} = map(known_dim, fieldtypes(D))
 """
     FixedSizeArrayDims{T,N,D,Mem<:DenseVector{T}} <: DenseArray{T,N}
 
-The underlying type of [`FixedSizeArray`](@ref), with the dimensions type `D`, a tuple type
-of `Int`s and `StaticInt`s from [Static.jl](https://github.com/SciML/Static.jl):
+The underlying type of [`FixedSizeArray`](@ref), with static or dynamic dimensions.
+
+The dimensions type `D` is a tuple type of `Int`s (dynamic dimensions) and `StaticInt`s
+from [Static.jl](https://github.com/SciML/Static.jl) (static dimensions):
 `FixedSizeArray{T,N,Mem}` is `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`, with all
 dimensions dynamic. Use `FixedSizeArrayDims` to construct a `FixedSizeArray` with static
 dimensions, see [`FixedSizeArray`](@ref) and [`FixedSizeArrays.wrap`](@ref):
