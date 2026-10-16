@@ -37,12 +37,6 @@ julia> FixedSizeArray{Float64}(arr)  # construct from an `AbstractArray` value w
  30.0  14.0
 ```
 
-!!! note "The printed type"
-
-    Depending on the version of Julia, the type of a `FixedSizeArray` may be printed as `FixedSizeArrays.FixedSizeArrayDims{Int64, 2, Tuple{Int64, Int64}, Memory{Int64}}`, as above, rather than as `FixedSizeMatrix{Int64, Memory{Int64}}`.
-    `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`: the third parameter is the type of the dimensions of the array, here two `Int`s, i.e. two dimensions set at runtime.
-    See [Static dimensions: the `FixedSizeArrayDims` type](@ref) for the arrays in which some of them are `StaticInt`s instead.
-
 To "convert" a wrapper type like `Adjoint` while preserving the wrapper structure, you can use `Adapt`:
 
 ```jldoctest
