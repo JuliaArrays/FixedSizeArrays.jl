@@ -193,7 +193,7 @@ Convenient aliases provided:
 const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 
 """
-    static_dims(a::FixedSizeArray)::Tuple
+    static_dims(a::FixedSizeArrayDims)::Tuple
 
 Return the dimensions of `a`, a tuple of `StaticInt`s and `Int`s.
 """
@@ -498,7 +498,7 @@ function check_count_value(n)
 end
 
 """
-    parent(f::FixedSizeArray)
+    parent(f::FixedSizeArrayDims)
 
 Return the underlying parent object of the fixed-size array `f`, a `DenseVector` of length
 `length(f)`. Use `parentindices(f)` to get the valid indices of the parent of `f`.
