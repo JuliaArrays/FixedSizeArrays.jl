@@ -7,7 +7,14 @@
 [![Coverage](https://codecov.io/gh/JuliaArrays/FixedSizeArrays.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/JuliaArrays/FixedSizeArrays.jl)
 [![PkgEval](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/F/FixedSizeArrays.svg)](https://JuliaCI.github.io/NanosoldierReports/pkgeval_badges/F/FixedSizeArrays.html)
 
-[`FixedSizeArrays.jl`](https://github.com/JuliaArrays/FixedSizeArrays.jl) is a package for the [Julia programming language](https://julialang.org/) which implements mutable fixed-size arrays (`FixedSizeArray`), which means the length of the array can not change after construction and is amenable to be [constant-propagated](https://en.wikipedia.org/wiki/Constant_folding) at compile-time when possible.
+[`FixedSizeArrays.jl`](https://github.com/JuliaArrays/FixedSizeArrays.jl) is a package for the [Julia programming language](https://julialang.org/) which implements mutable fixed-size arrays: arrays whose size is set once, at construction, and cannot change afterwards.
+The size can be fixed at two different stages:
+
+* at runtime, with `FixedSizeArray`: the size is a constant field of the array, so arrays of all sizes share the same type and compiled code, and the compiler can [constant-propagate](https://en.wikipedia.org/wiki/Constant_folding) it when it is known at compile time;
+* at compile time, dimension by dimension, with `FixedSizeArrays.FixedSizeArrayDims`: each dimension can be static, a compile-time constant which is part of the type, or dynamic, an `Int` stored in the array.
+  Static dimensions require the [Static.jl](https://github.com/SciML/Static.jl) package, a weak dependency.
+
+`FixedSizeArray` is an alias for `FixedSizeArrayDims` with all dimensions dynamic, so everything which works for a `FixedSizeArray` also works for an array with static dimensions.
 
 FixedSizeArrays supports the [standard array interfaces](https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array), so things like broadcasting, matrix multiplication, other linear algebra operations, `similar`, `copyto!` or `map` should just work.
 
