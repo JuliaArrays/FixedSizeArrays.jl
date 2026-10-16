@@ -17,13 +17,13 @@ The default memory backend is the [`Memory`](https://docs.julialang.org/en/v1/ba
 
 ```@repl
 using FixedSizeArrays
-a = FixedSizeArray([1.0 2 3; 4 5 6])                   # size fixed at runtime: (2, 3)
+a = FixedSizeArray([1.0 2 3; 4 5 6]) # size fixed at runtime: (2, 3)
 a[1, 1] = 10
 using Static: static
 using FixedSizeArrays: FixedSizeArrayDims
-b = FixedSizeArrayDims{Float64}(undef, (static(2), 3));  # the first dimension is part of the type
+b = FixedSizeArrayDims{Float64}(undef, (static(2), 3)); # the first dimension is part of the type
 copyto!(b, a)
-size(b, 1)                                              # a compile-time constant
+size(b, 1) # a compile-time constant
 ```
 
 ## Which one should I use?
