@@ -243,6 +243,28 @@ function Base.similar(
     similar(FixedSizeArray{T, N, Mem{T}}, axes(bc))
 end
 
+# Out-of-place broadcasting.  The generic `copy` goes through `copyto!`, which checks
+# whether the destination aliases any argument, but a freshly allocated destination
+# cannot alias anything.  Skipping the check removes the copy in the aliasing branch from
+# the generated code, which is otherwise particularly costly for automatic
+# differentiation with Enzyme.
+@inline function Base.copy(bc::Broadcast.Broadcasted{FixedSizeArrayBroadcastStyle{N, Mem}}) where {N, Mem}
+    ElType = Broadcast.combine_eltypes(bc.f, bc.args)
+    if Base.isconcretetype(ElType)
+        dest = similar(bc, ElType)
+        src = Broadcast.preprocess(nothing, bc)
+        @inbounds @simd for I in eachindex(src)
+            dest[I] = src[I]
+        end
+        return dest
+    end
+    # use the generic implementation, which widens the element type as needed
+    return @invoke copy(bc::Broadcast.Broadcasted)
+end
+
+# Zero-dimensional broadcasting returns a scalar, as in `Base`.
+Base.copy(bc::Broadcast.Broadcasted{FixedSizeArrayBroadcastStyle{0, Mem}}) where {Mem} = bc[CartesianIndex()]
+
 # helper functions
 
 val_parameter(::Val{P}) where {P} = P

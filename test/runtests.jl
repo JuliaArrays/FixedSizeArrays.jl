@@ -600,6 +600,39 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                     test_inferred(bm, TMF, (vm22, mf22))
                     test_inferred(bm, TMF, (mf22, vm22))
                 end
+                @testset "aliasing" begin
+                    v = TVI(1:4)
+                    c = @inferred Base.unaliascopy(v)
+                    @test c isa TVI
+                    @test c == v
+                    @test parent(c) !== parent(v)
+                    # overlapping source and destination are unaliased with `unaliascopy`
+                    @views v[2:4] .= v[1:3]
+                    @test v == [1, 1, 2, 3]
+                end
+                @testset "out-of-place" begin
+                    # zero-dimensional broadcasting returns a scalar
+                    a0 = FSA{Int}(undef, ())
+                    a0[] = 3
+                    @test (@inferred a0 .+ 1) === 4
+                    # empty arrays
+                    e = TVF(undef, 0)
+                    @test (@inferred e .+ 1) isa TVF
+                    @test isempty(e .+ 1)
+                    # a non-concrete element type is widened as needed
+                    w = FSV{Any}(undef, 2)
+                    w[1] = 1
+                    w[2] = 2.0
+                    r = w .+ 1
+                    @test r isa FSV{Real}
+                    @test r == [2, 3.0]
+                    # different shapes and views of the same array
+                    m = FSM{Int}([1 2; 3 4; 5 6])
+                    @test (@inferred m .+ v3) isa FSM{Int}
+                    @test m .+ v3 == collect(m) .+ collect(v3)
+                    @test v3 .* v3' == collect(v3) .* collect(v3)'
+                    @test (@views v3[1:2] .+ v3[2:3]) == [3, 5]
+                end
             end
 
             @testset "`isassigned`" begin

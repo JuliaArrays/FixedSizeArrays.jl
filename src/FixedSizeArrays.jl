@@ -20,6 +20,13 @@ if isdefined(Base, :dataids) && (Base.dataids isa Function)
     Base.dataids(a::FixedSizeArray) = Base.dataids(parent(a))
 end
 
+if isdefined(Base, :unaliascopy) && (Base.unaliascopy isa Function)
+    # This is an internal, non-public function.  The generic fallback for
+    # `AbstractArray`s is `@noinline`, which leaves an opaque call in every
+    # broadcast and penalises e.g. automatic differentiation with Enzyme.
+    Base.unaliascopy(a::FixedSizeArray) = copy(a)
+end
+
 include("collect_as.jl")
 
 @static if VERSION >= v"1.11.0-DEV.469"

@@ -135,6 +135,12 @@ end
 fc_broadcast_scale!(B, a, A) = (B .= a .* A; nothing)
 fc_broadcast_copy!(B, A) = (B .= A; nothing)
 
+# Out-of-place broadcasting, whose freshly allocated destination needs no aliasing check.
+# The check copies the arguments with `memmove`, which is distinguishable only from
+# Julia 1.11 on, where the default storage type is `Memory`.
+fc_broadcast_oop(A) = A .+ A
+const fc_run_oop_broadcast_checks = VERSION >= v"1.11"
+
 # Out-of-bounds Cartesian indexing must not capture the array in the error, otherwise the
 # heap allocation of the `Memory` cannot be eliminated, see issue #175 and PR #176.
 function fc_fill_reduce_2d(n, i, j)
@@ -494,6 +500,30 @@ build_is_production_build &&
         @test @filecheck begin
             @check "define"
             @check_not "object_id"
+            code_llvm(fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        end
+    end
+
+    fc_run_oop_broadcast_checks &&
+    @testset "out-of-place broadcasting: one allocation, no aliasing check" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not "memmove"
+            @check "jl_alloc_genericmemory"
+            @check_not "{{memmove|jl_alloc_genericmemory}}"
+            code_llvm(fc_broadcast_oop, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+        end
+    end
+
+    @testset "broadcasting does not call the `@noinline` generic `unaliascopy`" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not "unaliascopy"
+            code_llvm(fc_broadcast_scale!, (FixedSizeVectorDefault{Float64}, Float64, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        end
+        @test @filecheck begin
+            @check "define"
+            @check_not "unaliascopy"
             code_llvm(fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
         end
     end
