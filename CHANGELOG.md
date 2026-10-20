@@ -2,6 +2,22 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version [v1.5.0](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.5.0) - Unreleased
+
+### Added
+
+* Static dimensions: `FixedSizeArray{T,N,Mem}` is now an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`, where the new public (but not exported) type `FixedSizeArrays.FixedSizeArrayDims{T,N,D,Mem}` is an `N`-dimensional array over a memory backend `Mem<:DenseVector{T}` whose dimensions are a tuple of type `D` of `Int`s, `Val`s and `StaticInt`s from [Static.jl](https://github.com/SciML/Static.jl) (e.g. `(Val(5), Val(4), n)` or `(static(5), static(4), n)`), so that any dimension can be a compile-time constant while the others are set at runtime. Linear indices, strides and sizes are computed at compile time as far as the dimensions are static. An array with static dimensions can be constructed with `FixedSizeArrays.wrap(FixedSizeArrayDims, parent, dims)`, with `collect_as`, or with the constructors of `FixedSizeArrayDims` (`undef` or converting from another array); the dimensions given to a `FixedSizeArray` constructor are converted to `Int`s. It supports the strided arrays interface, `similar`, `copy`, `fill!`, `copyto!`, broadcasting (returning `FixedSizeArray`s), and the package extensions with MPI.jl, Adapt.jl (adapting the memory backend for any memory backend), and the new package extension with [StaticArrayInterface.jl](https://github.com/JuliaArrays/StaticArrayInterface.jl), which provides static sizes and strides to e.g. StrideArraysCore.jl, LoopVectorization.jl and Polyester.jl. `Val` dimensions need no other package, while `StaticInt` dimensions are available with the new package extension with Static.jl, which is a weak dependency.
+* `FixedSizeArrays.wrap` now accepts at most one dimension given as `:`, which is computed from the length of the parent.
+* With StaticArrayInterface.jl, `StaticArrayInterface.device` of a `FixedSizeArray` is now the one of its memory backend, e.g. a GPU memory backend is not treated as a CPU pointer by LoopVectorization.jl.
+
+### Changed
+
+* `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout and methods as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, and `FixedSizeArray{T,N}` with an invalid `N` (e.g. `FixedSizeArray{Int,-1}`) now throws an error when the type is formed.
+
+### Fixed
+
+* Improved performance of `fill!` on Julia v1.13 and later: `fill!(::FixedSizeArray, x)` now loops directly over the memory backend, which elides the bounds checks and vectorizes. ([#200](https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200))
+
 ## Version [v1.4.2](https://github.com/JuliaArrays/FixedSizeArrays.jl/releases/tag/v1.4.2) - 2026-10-13
 
 ### Added

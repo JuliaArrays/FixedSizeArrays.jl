@@ -17,7 +17,7 @@ if isdefined(Base, :dataids) && (Base.dataids isa Function)
     # This is an internal, non-public function which is nevertheless needed to
     # get good performance in some cases (e.g. broadcasting):
     # <https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/63>.
-    Base.dataids(a::FixedSizeArray) = Base.dataids(parent(a))
+    Base.dataids(a::FixedSizeArrayDims) = Base.dataids(parent(a))
 end
 
 if isdefined(Base, :unaliascopy) && (Base.unaliascopy isa Function)
@@ -30,7 +30,7 @@ end
 include("collect_as.jl")
 
 @static if VERSION >= v"1.11.0-DEV.469"
-    eval(Expr(:public, :wrap))
+    eval(Expr(:public, :wrap, :FixedSizeArrayDims))
 end
 
 end # module FixedSizeArrays
