@@ -42,7 +42,7 @@ function (collect::Collect)(::Type{FSA}, iterator) where {FSA<:FixedSizeArrayDim
     if iterator isa FSA
         return copy(iterator)
     end
-    backing = collect(parent_type_with_default(T), iterator)
+    backing = collect_storage(collect, parent_type_with_default(T), iterator)
     wrap(T, backing, inferred_shape(T, iterator))
 end
 
