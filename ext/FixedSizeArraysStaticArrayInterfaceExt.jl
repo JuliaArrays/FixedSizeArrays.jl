@@ -9,11 +9,15 @@ using StaticArrayInterface: StaticArrayInterface
 using Static: StaticInt
 using FixedSizeArrays: FixedSizeArrayDims, known_dims, parent_type, static_dims
 
-StaticArrayInterface.static_size(a::FixedSizeArrayDims) = static_dims(a)
+# The dimensions with the static ones as `StaticInt`s, also those given as `Val`s.
+to_static_int(d::Union{Int, StaticInt}) = d
+to_static_int(::Val{N}) where {N} = StaticInt(N)
+
+StaticArrayInterface.static_size(a::FixedSizeArrayDims) = map(to_static_int, static_dims(a))
 
 # The stride in a dimension is a `StaticInt` if all the dimensions before it are static.
 function StaticArrayInterface.static_strides(a::FixedSizeArrayDims)
-    Base.front(accumulate(*, (StaticInt(1), static_dims(a)...)))
+    Base.front(accumulate(*, (StaticInt(1), StaticArrayInterface.static_size(a)...)))
 end
 
 function StaticArrayInterface.known_size(::Type{<:FixedSizeArrayDims{<:Any, <:Any, D}}) where {D}

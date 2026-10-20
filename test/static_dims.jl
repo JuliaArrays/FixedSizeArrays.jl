@@ -376,6 +376,79 @@ fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
         @test a .+ c == 2 .* ref
     end
 
+    @testset "`Val` dimensions: $Mem" for Mem ∈ storage_types
+        ref = reshape(collect(1.0:24.0), 2, 3, 4)
+        p = Mem{Float64}(undef, 24)
+        p .= vec(ref)
+        R{T} = FixedSizeArrayDims{T, 3, Tuple{Val{2}, Val{3}, Int}, Mem{T}}
+        # construction
+        a = wrap(FixedSizeArrayDims, p, (Val(2), Val(3), 4))
+        @test a isa R{Float64}
+        @test !(a isa FixedSizeArray)
+        @test FixedSizeArrays.static_dims(a) === (Val(2), Val(3), 4)
+        @test parent(a) === p
+        @test a == ref
+        test_inferred(wrap, R{Float64}, (FixedSizeArrayDims, p, (Val(2), Val(3), 4)))
+        @test FixedSizeArrays.static_dims(wrap(FixedSizeArrayDims, p, Val(2), Val(3), 4)) === (Val(2), Val(3), 4)
+        @test FixedSizeArrays.static_dims(wrap(FixedSizeArrayDims, p, (Val(2), :, Val(4)))) === (Val(2), 3, Val(4))
+        @test FixedSizeArrays.static_dims(wrap(R{Float64}, p, (2, 3, :))) === (Val(2), Val(3), 4)
+        test_inferred(FixedSizeArrayDims{Float64, 3, D, Mem{Float64}} where {D}, R{Float64}, (undef, (Val(2), Val(3), 4)))
+        test_inferred(FixedSizeArrayDims{Float64}, FixedSizeArrayDims{Float64, 3, Tuple{Val{2}, Val{3}, Int}, default{Float64}}, (undef, Val(2), Val(3), 4))
+        test_inferred(R{Float64}, (undef, (2, 3, 4)))
+        # `Integer`s are converted to `Int`s, also in `Val`s
+        @test FixedSizeArrays.static_dims(R{Float64}(undef, (Int8(2), UInt(3), Int16(4)))) === (Val(2), Val(3), 4)
+        @test FixedSizeArrays.static_dims(FixedSizeArrayDims{Float64}(undef, (Val(Int8(2)), UInt(3)))) === (Val(2), 3)
+        @test FixedSizeArrays.static_dims(R{Float64}(undef, (Val(UInt8(2)), Val(3), 4))) === (Val(2), Val(3), 4)
+        # to a `FixedSizeArray`: the dimensions are converted to `Int`s
+        @test FixedSizeArrays.static_dims(FixedSizeArray{Float64}(undef, (Val(2), 3))) === (2, 3)
+        @test FixedSizeArrays.static_dims(wrap(FixedSizeArray, p, (Val(2), :, Val(4)))) === (2, 3, 4)
+        # errors
+        @test_throws DimensionMismatch R{Float64}(undef, (3, 2, 4))
+        @test_throws DimensionMismatch R{Float64}(undef, (Val(3), Val(2), 4))
+        @test_throws DimensionMismatch wrap(FixedSizeArrayDims, p, (Val(2), Val(3), 3))
+        @test_throws ArgumentError FixedSizeArrayDims{Float64}(undef, (Val(:a), 3))
+        @test_throws ArgumentError FixedSizeArrayDims{Float64}(undef, (Val(2.0), 3))
+        @test_throws ArgumentError FixedSizeArrayDims{Float64}(undef, (Val(-2), 3))
+        @test_throws ArgumentError wrap(FixedSizeArrayDims, p, (Val(0), :))
+        # converting constructor and `collect_as`
+        for f ∈ (R{Float64}, x -> collect_as(R{Float64}, x))
+            @test f(ref) isa R{Float64}
+            @test f(ref) == ref
+        end
+        @test collect_as(FixedSizeArrayDims{Int, 1, Tuple{Val{3}}}, (i^2 for i ∈ 1:3)) == [1, 4, 9]
+        @test_throws DimensionMismatch R{Float64}(reshape(1:24, 3, 2, 4))
+        # static sizes and strides
+        T = typeof(FixedSizeArrayDims{Float64}(undef, (Val(5), Val(4), Val(4), 7)))
+        @test Base.return_types(a -> Val(size(a)[1:3]), (T,)) == [Val{(5, 4, 4)}]
+        @test Base.return_types(a -> Val(strides(a)), (T,)) == [Val{(1, 5, 20, 80)}]
+        @test Base.return_types(a -> Val(stride(a, 4)), (T,)) == [Val{80}]
+        @test sizeof(T) == sizeof(FixedSizeVectorDefault{Float64})
+        # indexing
+        for I ∈ CartesianIndices(ref)
+            @test a[I] === ref[I]
+            @test a[Tuple(I)...] === ref[I]
+        end
+        test_inferred_noalloc(getindex, Float64, (a, 2, 3, 4))
+        @test_throws BoundsErrorLight a[3, 1, 1]
+        # `similar`, `copy`, broadcasting
+        test_inferred(similar, R{Float64}, (a,))
+        test_inferred(similar, R{Int}, (a, Int))
+        test_inferred(similar, FixedSizeArray{Int, 3, Mem{Int}}, (a, Int, (2, 3, 4)))
+        test_inferred(similar, R{Float64}, (R{Float64}, (2, 3, 7)))
+        test_inferred(copy, R{Float64}, (a,))
+        @test copy(a) == a
+        test_inferred((x, y) -> x .+ y, FixedSizeArray{Float64, 3, Mem{Float64}}, (a, a))
+        @test a .+ a == 2 .* ref
+        b = similar(a)
+        test_inferred_noalloc(((x, y) -> x .= y .+ 1), typeof(b), (b, a))
+        @test b == ref .+ 1
+        # mixed with `StaticInt`s
+        m = wrap(FixedSizeArrayDims, p, (Val(2), static(3), 4))
+        @test m isa FixedSizeArrayDims{Float64, 3, Tuple{Val{2}, StaticInt{3}, Int}, Mem{Float64}}
+        @test m == ref
+        @test Base.return_types(a -> Val(strides(a)[1:3]), (typeof(m),)) == [Val{(1, 2, 6)}]
+    end
+
     @testset "StaticArrayInterface" begin
         a = FixedSizeArrayDims{Float64}(undef, (static(5), static(4), static(4), 7))
         T = typeof(a)
@@ -397,6 +470,15 @@ fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
         @test StaticArrayInterface.static_strides(m) === (static(1), 3, 12, 24)
         @test StaticArrayInterface.known_size(typeof(m)) === (nothing, 4, nothing, 5)
         @test StaticArrayInterface.known_strides(typeof(m)) === (1, nothing, nothing, nothing)
+        # `Val` dimensions are `StaticInt`s
+        w = FixedSizeArrayDims{Float64}(undef, (Val(5), static(4), Val(4), 7))
+        @test StaticArrayInterface.static_size(w) === (StaticInt(5), StaticInt(4), StaticInt(4), 7)
+        @test StaticArrayInterface.static_strides(w) === (StaticInt(1), StaticInt(5), StaticInt(20), StaticInt(80))
+        test_inferred_noalloc(StaticArrayInterface.static_size, Tuple{StaticInt{5}, StaticInt{4}, StaticInt{4}, Int}, (w,))
+        test_inferred_noalloc(StaticArrayInterface.static_strides, Tuple{StaticInt{1}, StaticInt{5}, StaticInt{20}, StaticInt{80}}, (w,))
+        @test StaticArrayInterface.known_size(typeof(w)) === (5, 4, 4, nothing)
+        @test StaticArrayInterface.known_strides(typeof(w)) === (1, 5, 20, 80)
+        @test StaticArrayInterface.static_size(w, 3) === StaticInt(4)
         v = FixedSizeArrayDims{Float64}(undef, (3,))
         @test v isa FixedSizeVector
         @test StaticArrayInterface.static_size(v) === (3,)

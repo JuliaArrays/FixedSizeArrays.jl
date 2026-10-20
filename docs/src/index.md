@@ -9,7 +9,7 @@ The size can be fixed at two different stages:
   The compiler then computes the sizes, strides and linear indices along the static dimensions at compile time, in any function which receives the array.
 
 These are not two separate array types: `FixedSizeArray` is an alias for `FixedSizeArrayDims` with all dimensions dynamic, so everything which works for a `FixedSizeArray` also works for an array with static dimensions.
-Static dimensions are opt-in: they require the [Static.jl](https://github.com/SciML/Static.jl) package, which is a weak dependency of FixedSizeArrays.jl.
+Static dimensions are given as `Val`s, e.g. `Val(4)`, or as `StaticInt`s from the [Static.jl](https://github.com/SciML/Static.jl) package, e.g. `static(4)`, which is a weak dependency of FixedSizeArrays.jl.
 
 Both kinds of arrays support the [standard array interfaces](https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array), so things like broadcasting, matrix multiplication, other linear algebra operations, `similar`, `copyto!` or `map` should just work.
 The elements are stored contiguously in a *memory backend*, which can be any `DenseVector`, e.g. a GPU vector.
@@ -19,9 +19,8 @@ The default memory backend is the [`Memory`](https://docs.julialang.org/en/v1/ba
 using FixedSizeArrays
 a = FixedSizeArray([1.0 2 3; 4 5 6]) # size fixed at runtime: (2, 3)
 a[1, 1] = 10
-using Static: static
 using FixedSizeArrays: FixedSizeArrayDims
-b = FixedSizeArrayDims{Float64}(undef, (static(2), 3)); # the first dimension is part of the type
+b = FixedSizeArrayDims{Float64}(undef, (Val(2), 3)); # the first dimension is part of the type
 copyto!(b, a)
 size(b, 1) # a compile-time constant
 ```

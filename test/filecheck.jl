@@ -110,6 +110,9 @@ fc_setindex!(A, i, x) = (A[i] = x; nothing)
 
 # Cartesian indexing of an array with static dimensions.
 const fc_static_dims_array = FixedSizeArrayDims{Float64, 3, Tuple{StaticInt{5}, StaticInt{4}, Int}, FixedSizeArrays.default_underlying_storage_type{Float64}}
+# The same, with the static dimensions as `Val`s.
+const fc_val_dims_array = FixedSizeArrayDims{Float64, 3, Tuple{Val{5}, Val{4}, Int}, FixedSizeArrays.default_underlying_storage_type{Float64}}
+const fc_static_dims_arrays = (fc_static_dims_array, fc_val_dims_array)
 fc_getindex(A, i, j, k) = A[i, j, k]
 fc_getindex_inbounds(A, i, j, k) = @inbounds A[i, j, k]
 fc_setindex_inbounds!(A, i, j, k, x) = (@inbounds A[i, j, k] = x; nothing)
@@ -417,14 +420,14 @@ build_is_production_build &&
         end
     end
 
-    @testset "`size` in a static dimension is constant-folded" begin
+    @testset "`size` in a static dimension is constant-folded: $(A)" for A in fc_static_dims_arrays
         # The whole function body is a single `ret` of a literal: the size is not loaded.
         @test @filecheck begin
             @check "define"
             @check_next "top:"
             @check_next "ret $fc_int 12"
             @check_next "}"
-            fc_llvm(fc_static_size, (fc_static_dims_array,))
+            fc_llvm(fc_static_size, (A,))
         end
     end
 
@@ -452,6 +455,7 @@ build_is_production_build &&
             ("`getindex`", fc_getindex, (FixedSizeVectorDefault{Float64}, Int)),
             ("`setindex!`", fc_setindex!, (FixedSizeVectorDefault{Float64}, Int, Float64)),
             ("Cartesian `getindex` with static dimensions", fc_getindex, (fc_static_dims_array, Int, Int, Int)),
+            ("Cartesian `getindex` with `Val` dimensions", fc_getindex, (fc_val_dims_array, Int, Int, Int)),
         )
             @test @filecheck begin
                 @check "define"
@@ -463,7 +467,7 @@ build_is_production_build &&
     end
 
     fc_run_bounds_error_name_checks &&
-    @testset "Cartesian indexing of an array with static dimensions" begin
+    @testset "Cartesian indexing of an array with static dimensions: $(A)" for A in fc_static_dims_arrays
         # The static sizes are constants (e.g. the multiplication by the first size), and the
         # size in the last dimension is not loaded.
         @testset "`@inbounds`: no bounds check, static sizes" begin
@@ -475,7 +479,7 @@ build_is_production_build &&
                 @check "load double"
                 @check_not fc_bounds_error_or_int_load
                 @check "ret double"
-                fc_llvm(fc_getindex_inbounds, (fc_static_dims_array, Int, Int, Int))
+                fc_llvm(fc_getindex_inbounds, (A, Int, Int, Int))
             end
             @test @filecheck begin
                 @check "define"
@@ -483,7 +487,7 @@ build_is_production_build &&
                 @check "store double"
                 @check_not fc_bounds_error
                 @check "ret void"
-                fc_llvm(fc_setindex_inbounds!, (fc_static_dims_array, Int, Int, Int, Float64))
+                fc_llvm(fc_setindex_inbounds!, (A, Int, Int, Int, Float64))
             end
         end
     end
@@ -500,7 +504,7 @@ build_is_production_build &&
 
     fc_run_bounds_check_elision_checks &&
     @testset "in-place broadcasting: no allocation, no bounds check, vectorized" begin
-        @testset "$(A)" for A in (FixedSizeVectorDefault{Float64}, fc_static_dims_array)
+        @testset "$(A)" for A in (FixedSizeVectorDefault{Float64}, fc_static_dims_arrays...)
             @test @filecheck begin
                 @check "define"
                 @check_not fc_alloc_call
@@ -519,6 +523,7 @@ build_is_production_build &&
         @testset "$(name)" for (name, A, skipped) in (
             ("array", fc_fill_array, false),
             ("static dimensions", fc_static_dims_array, false),
+            ("`Val` dimensions", fc_val_dims_array, false),
             ("view", fc_fill_view, fc_fill_view_bounds_check_skipped),
         )
             # Do not print the FileCheck diagnostic while the test is known to be broken.

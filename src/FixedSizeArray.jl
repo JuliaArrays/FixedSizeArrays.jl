@@ -5,9 +5,10 @@ export
 
 # Dimensions of a `FixedSizeArray`: each one is either dynamic, an `Int` stored in the
 # array, or static, a compile-time constant which takes no space, e.g.
-# `Tuple{StaticInt{4}, Int}` for `(4, n)`. Static dimensions are `StaticInt`s from
-# Static.jl, which is a weak dependency: the methods for them are in the package extension
-# `FixedSizeArraysStaticExt`, while `src` only uses these functions.
+# `Tuple{StaticInt{4}, Int}` or `Tuple{Val{4}, Int}` for `(4, n)`. Static dimensions are
+# `Val`s, whose methods are here, or `StaticInt`s from Static.jl, which is a weak
+# dependency: the methods for them are in the package extension `FixedSizeArraysStaticExt`,
+# while the rest of `src` only uses these functions.
 
 # The value of a dimension.
 #
@@ -22,9 +23,11 @@ export
 # Passing each dimension through an intrinsic forces the tuple to be materialized in `size`
 # (as for `Array` and `PtrArray`) and is a no-op otherwise.
 dim_value(d::Int) = Core.Intrinsics.bitcast(Int, d)
+dim_value(::Val{N}) where {N} = N
 
 # The value of a dimension of type `D` if it is static, `nothing` otherwise.
 known_dim(::Type{Int}) = nothing
+known_dim(::Type{Val{N}}) where {N} = N
 known_dims(::Type{D}) where {D <: Tuple} = map(known_dim, fieldtypes(D))
 
 # (`D` has no bound in the type, so that e.g. `FixedSizeArrayDims{T, N, D, Mem} where {D}` is
@@ -35,8 +38,8 @@ known_dims(::Type{D}) where {D <: Tuple} = map(known_dim, fieldtypes(D))
 
 Construct a fixed-size `FixedSizeArrayDims` with element type `T`, number of dimensions `N`, dimensions `D`, and memory backend `Mem`.
 
-The dimensions type `D` is a tuple type of `Int`s (dynamic dimensions) and `StaticInt`s
-from [Static.jl](https://github.com/SciML/Static.jl) (static dimensions):
+The dimensions type `D` is a tuple type of `Int`s (dynamic dimensions) and `Val`s or
+`StaticInt`s from [Static.jl](https://github.com/SciML/Static.jl) (static dimensions):
 `FixedSizeArray{T,N,Mem}` is `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`, with all
 dimensions dynamic. Use `FixedSizeArrayDims` to construct a `FixedSizeArray` with static
 dimensions, see [`FixedSizeArray`](@ref) and [`FixedSizeArrays.wrap`](@ref):
@@ -78,14 +81,15 @@ Convenient aliases provided:
 # Static dimensions
 
 `FixedSizeArray{T,N,Mem}` is an alias for [`FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`](@ref FixedSizeArrayDims):
-the dimensions of a `FixedSizeArrayDims{T,N,D,Mem}` are a tuple `dims::D` of `Int`s and
-`StaticInt`s from [Static.jl](https://github.com/SciML/Static.jl). Each dimension can be
+the dimensions of a `FixedSizeArrayDims{T,N,D,Mem}` are a tuple `dims::D` of `Int`s, `Val`s
+and `StaticInt`s from [Static.jl](https://github.com/SciML/Static.jl). Each dimension can be
 dynamic, i.e. an `Int` stored in the array, or static, i.e. a compile-time constant which
 is part of the type `D` and takes no space in the array. E.g. with
+`dims = (Val(5), Val(4), n)`, `D = Tuple{Val{5}, Val{4}, Int}`, or with
 `dims = (static(5), static(4), n)`, `D = Tuple{StaticInt{5}, StaticInt{4}, Int}`, the array
 has size `(5, 4, n)`, and `n` can be different for different arrays of the same type.
-Static.jl is a weak dependency: load it (e.g. with `using Static: static`) to use static
-dimensions.
+Static.jl is a weak dependency: load it (e.g. with `using Static: static`) to use `StaticInt`
+dimensions, while `Val` dimensions need no other package.
 
 The static dimensions allow the compiler to compute the linear indices, the strides, and
 the sizes in these dimensions at compile time, which is useful e.g. for arrays where some
@@ -95,8 +99,8 @@ dimensions are fixed (variables, nodes, ...) while others (elements of a mesh, p
 [`FixedSizeArrays.wrap`](@ref) around an existing memory backend.
 
 The dimensions given to a constructor are converted to the dimensions type of the array, if
-its type gives it: e.g. `FixedSizeArray{T}(undef, (static(2), 3))` has two dynamic
-dimensions, while `FixedSizeArrayDims{T}(undef, (static(2), 3))` has a static one.
+its type gives it: e.g. `FixedSizeArray{T}(undef, (Val(2), 3))` has two dynamic
+dimensions, while `FixedSizeArrayDims{T}(undef, (Val(2), 3))` has a static one.
 
 # Examples
 
@@ -105,20 +109,25 @@ julia> using FixedSizeArrays
 
 julia> using FixedSizeArrays: FixedSizeArrayDims
 
-julia> using Static: static, StaticInt
-
 julia> a = FixedSizeArray{Float64}(undef, (2, 3));
 
 julia> typeof(a) === FixedSizeArray{Float64, 2, Memory{Float64}} === FixedSizeArrayDims{Float64, 2, Tuple{Int, Int}, Memory{Float64}}
 true
 
-julia> b = FixedSizeArrayDims{Int}(undef, (static(2), static(3), 2));  # two static dimensions
+julia> b = FixedSizeArrayDims{Int}(undef, (Val(2), Val(3), 2));  # two static dimensions
 
 julia> typeof(b)
-FixedSizeArrayDims{Int64, 3, Tuple{StaticInt{2}, StaticInt{3}, Int64}, Memory{Int64}}
+FixedSizeArrayDims{Int64, 3, Tuple{Val{2}, Val{3}, Int64}, Memory{Int64}}
 
 julia> size(b), size(b, 1), strides(b)
 ((2, 3, 2), 2, (1, 2, 6))
+
+julia> using Static: static, StaticInt
+
+julia> c = FixedSizeArrayDims{Int}(undef, (static(2), 3));  # a static dimension from Static.jl
+
+julia> typeof(c)
+FixedSizeArrayDims{Int64, 2, Tuple{StaticInt{2}, Int64}, Memory{Int64}}
 ```
 """
 const FixedSizeArray{T,N,Mem<:DenseVector{T}} = FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}
@@ -195,12 +204,16 @@ const FixedSizeMatrix{T} = FixedSizeArray{T,2}
 """
     static_dims(a::FixedSizeArrayDims)::Tuple
 
-Return the dimensions of `a`, a tuple of `StaticInt`s and `Int`s.
+Return the dimensions of `a`, a tuple of `StaticInt`s, `Val`s and `Int`s.
 """
 static_dims(a::FixedSizeArrayDims) = getfield(a, :dims)
 
-# `Integer`s as `Int`s, `StaticInt`s (in the Static.jl extension) as they are
+# `Integer`s as `Int`s, `Val`s of `Int`s and `StaticInt`s (in the Static.jl extension) as
+# they are, `Val`s of other `Integer`s as `Val`s of `Int`s
 to_static_dim(d::Integer) = Int(d)::Int
+to_static_dim(d::Val{N}) where {N} = N isa Int ? d : val_dim(N)
+val_dim(n::Integer) = Val(Int(n)::Int)
+val_dim(n) = throw(ArgumentError(lazy"a `Val` dimension must be a `Val` of an integer, got `Val($(repr(n)))`"))
 to_static_dim(::Colon) = throw(ArgumentError("a `Colon` dimension is only supported by `FixedSizeArrays.wrap`"))
 
 Base.size(a::FixedSizeArrayDims) = map(dim_value, static_dims(a))
@@ -251,7 +264,7 @@ end
 
 # Convert the dimensions `dims` to the type `D`: the entries which are static in `D` must
 # be equal to the static dimensions, the others are converted to `Int`s. Without `D`, the
-# dimensions are taken as given: `Integer`s as `Int`s, `StaticInt`s as they are.
+# dimensions are taken as given: `Integer`s as `Int`s, `Val`s and `StaticInt`s as they are.
 convert_dims(::Nothing, dims::Tuple) = map(to_static_dim, dims)
 convert_dims(::Type{Tuple{Vararg{Int}}}, dims::Tuple) = map(Base.Fix1(convert_dim, Int), dims)
 function convert_dims(::Type{D}, dims::Tuple) where {D <: Tuple}
@@ -261,8 +274,14 @@ function convert_dims(::Type{D}, dims::Tuple) where {D <: Tuple}
     map(convert_dim, fieldtypes(D), dims)
 end
 
-# (static dimensions: in the Static.jl extension)
 convert_dim(::Type{Int}, d) = Int(dim_value(to_static_dim(d)))::Int
+# (`StaticInt`s: in the Static.jl extension)
+function convert_dim(::Type{Val{N}}, d) where {N}
+    if dim_value(to_static_dim(d)) != N  # (`to_static_dim`: `Integer`s which are not `Int`s)
+        throw(DimensionMismatch(lazy"the dimension $d does not match the static dimension $N"))
+    end
+    Val(N)
+end
 
 # The dimensions `dims` of an `FSA`, converted to its dimensions type.
 function to_dims(::Type{FSA}, dims::Tuple) where {FSA <: FixedSizeArrayDims}
@@ -287,7 +306,7 @@ end
 function (::Type{FSA})(::UndefInitializer, dims::Tuple) where {T, FSA <: FixedSizeArrayDims{T}}
     undef_constructor(FSA, dims)
 end
-function (::Type{FSA})(::UndefInitializer, dims::Vararg{Integer}) where {T, FSA <: FixedSizeArrayDims{T}}
+function (::Type{FSA})(::UndefInitializer, dims::Vararg{Union{Integer, Val}}) where {T, FSA <: FixedSizeArrayDims{T}}
     undef_constructor(FSA, dims)
 end
 
@@ -653,7 +672,7 @@ At most one dimension can be given as `:`, it is then computed from `length(pare
 Without `size`, the result is a vector of length `length(parent)`.
 
 With [`FixedSizeArrayDims`](@ref) as the first argument, the dimensions can also be
-`StaticInt`s, for an array with static dimensions.
+`Val`s or `StaticInt`s, for an array with static dimensions.
 
 The first argument can also be a more specific type, e.g. `FixedSizeArray{T,N,Mem}` or
 `FixedSizeArrayDims{T,N,D,Mem}`: the dimensions are converted to the dimensions type of the
@@ -697,16 +716,14 @@ With static dimensions:
 ```jldoctest
 julia> using FixedSizeArrays: FixedSizeArrays, FixedSizeArrayDims
 
-julia> using Static: static
-
 julia> v = collect(1.0:12.0);
 
-julia> a = FixedSizeArrays.wrap(FixedSizeArrayDims, v, (static(2), 3, static(2)));
+julia> a = FixedSizeArrays.wrap(FixedSizeArrayDims, v, (Val(2), 3, Val(2)));
 
 julia> size(a), parent(a) === v
 ((2, 3, 2), true)
 
-julia> size(FixedSizeArrays.wrap(FixedSizeArrayDims, resize!(v, 18), (static(2), static(3), :)))  # wrap again after resizing
+julia> size(FixedSizeArrays.wrap(FixedSizeArrayDims, resize!(v, 18), (Val(2), Val(3), :)))  # wrap again after resizing
 (2, 3, 3)
 ```
 """
@@ -718,7 +735,7 @@ function wrap(::Type{FSA}, parent::DenseVector, dims::Tuple) where {FSA <: Fixed
     end
     check_array_type(FSA, new_fixed_size_array(parent, d))
 end
-function wrap(::Type{FSA}, parent::DenseVector, size1::Integer, size::Vararg{Integer}) where {FSA <: FixedSizeArrayDims}
+function wrap(::Type{FSA}, parent::DenseVector, size1::Union{Integer, Val}, size::Vararg{Union{Integer, Val}}) where {FSA <: FixedSizeArrayDims}
     wrap(FSA, parent, (size1, size...))
 end
 function wrap(::Type{FSA}, parent::DenseVector) where {FSA <: FixedSizeArrayDims}

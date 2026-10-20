@@ -12,7 +12,7 @@ The size can be fixed at two different stages:
 
 * at runtime, with `FixedSizeArray`: the size is a constant field of the array, so arrays of all sizes share the same type and compiled code, and the compiler can [constant-propagate](https://en.wikipedia.org/wiki/Constant_folding) it when it is known at compile time;
 * at compile time, dimension by dimension, with `FixedSizeArrays.FixedSizeArrayDims`: each dimension can be static, a compile-time constant which is part of the type, or dynamic, an `Int` stored in the array.
-  Static dimensions require the [Static.jl](https://github.com/SciML/Static.jl) package, a weak dependency.
+  Static dimensions are `Val`s, or `StaticInt`s from the [Static.jl](https://github.com/SciML/Static.jl) package, a weak dependency.
 
 `FixedSizeArray` is an alias for `FixedSizeArrayDims` with all dimensions dynamic, so everything which works for a `FixedSizeArray` also works for an array with static dimensions.
 

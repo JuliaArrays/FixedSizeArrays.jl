@@ -120,12 +120,32 @@ With a plain `Array` or `FixedSizeArray` the compiler knows none of these sizes,
 For such arrays, this package lets you choose, for each dimension, whether it is *dynamic* or *static*:
 
 * a dynamic dimension is an `Int` stored in the array, as all dimensions of a `FixedSizeArray`;
-* a static dimension is a `StaticInt` from [Static.jl](https://github.com/SciML/Static.jl): it is part of the type of the array and takes no space in it, so the compiler can compute the size in that dimension, and the strides and linear indices involving it, at compile time.
+* a static dimension is a `Val` from `Base` or a `StaticInt` from [Static.jl](https://github.com/SciML/Static.jl), e.g. `Val(4)` or `static(4)`: it is part of the type of the array and takes no space in it, so the compiler can compute the size in that dimension, and the strides and linear indices involving it, at compile time.
 
-The dimensions are the third parameter of the underlying type [`FixedSizeArrays.FixedSizeArrayDims{T,N,D,Mem}`](@ref FixedSizeArrays.FixedSizeArrayDims): `D` is a tuple type of `N` `Int`s and `StaticInt`s, in any order.
+The dimensions are the third parameter of the underlying type [`FixedSizeArrays.FixedSizeArrayDims{T,N,D,Mem}`](@ref FixedSizeArrays.FixedSizeArrayDims): `D` is a tuple type of `N` `Int`s, `Val`s and `StaticInt`s, in any order.
 `FixedSizeArray{T,N,Mem}` is the alias `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}`, so all `FixedSizeArray`s are `FixedSizeArrayDims`s, but the arrays with static dimensions are not `FixedSizeArray`s.
 `FixedSizeArrayDims` is public, but not exported: use it as `FixedSizeArrays.FixedSizeArrayDims`, or import it with `using FixedSizeArrays: FixedSizeArrayDims`.
-Static.jl is a weak dependency of FixedSizeArrays.jl, so static dimensions are only available once you load it yourself, e.g. with `using Static: static`.
+Static.jl is a weak dependency of FixedSizeArrays.jl, so `StaticInt` dimensions are only available once you load it yourself, e.g. with `using Static: static`, while `Val` dimensions need no other package.
+The examples below use `Val`s; `StaticInt`s work in the same way, e.g. `FixedSizeArrayDims{Float64}(undef, (static(5), nelements))` or `FixedSizeArrayDims{Float64, 2, Tuple{StaticInt{2}, Int}}(arr)`.
+
+```jldoctest
+julia> using FixedSizeArrays: FixedSizeArrays, FixedSizeArrayDims
+
+julia> nelements = 3;
+
+julia> u = FixedSizeArrayDims{Float64}(undef, (Val(5), Val(4), Val(4), Val(4), nelements));
+
+julia> size(u), strides(u)
+((5, 4, 4, 4, 3), (1, 5, 20, 80, 320))
+
+julia> size(u, 2)  # a compile-time constant
+4
+
+julia> typeof(u)
+FixedSizeArrayDims{Float64, 5, Tuple{Val{5}, Val{4}, Val{4}, Val{4}, Int64}, Memory{Float64}}
+```
+
+The same array with `StaticInt`s from Static.jl:
 
 ```jldoctest
 julia> using FixedSizeArrays: FixedSizeArrays, FixedSizeArrayDims
@@ -139,54 +159,52 @@ julia> u = FixedSizeArrayDims{Float64}(undef, (static(5), static(4), static(4), 
 julia> size(u), strides(u)
 ((5, 4, 4, 4, 3), (1, 5, 20, 80, 320))
 
-julia> size(u, 2)  # a compile-time constant
-4
-
 julia> typeof(u)
 FixedSizeArrayDims{Float64, 5, Tuple{StaticInt{5}, StaticInt{4}, StaticInt{4}, StaticInt{4}, Int64}, Memory{Float64}}
 ```
+
+A `StaticInt{n}` and a `Val{n}` dimension behave the same, but are different types, so arrays which differ only in this are of different types too.
+With StaticArrayInterface.jl, the static sizes and strides are `StaticInt`s for both.
 
 Each combination of static dimensions is a different type, so the code using the array is compiled for each one: make static only the dimensions which are known in advance and matter for performance, such as the small ones in the example above.
 
 ### Constructing arrays with static dimensions
 
-The static dimensions cannot be derived from an array or an iterator, so an array with static dimensions is constructed either with dimensions given as `StaticInt`s, or with a type which specifies the dimensions type `D`:
+The static dimensions cannot be derived from an array or an iterator, so an array with static dimensions is constructed either with dimensions given as `Val`s or `StaticInt`s, or with a type which specifies the dimensions type `D`:
 
-* the `undef` constructor `FixedSizeArrayDims{T}(undef, dims)` makes static the dimensions given as `static(n)`, and dynamic those given as `Int`s, as in the example above;
-* the converting constructor and [`collect_as`](@ref "The `collect_as` utility") need the dimensions type: `FixedSizeArrayDims{Float64, 2, Tuple{StaticInt{2}, Int}}(arr)` copies the matrix `arr` into an array whose first dimension is static, and `collect_as(FixedSizeArrayDims{Int, 1, Tuple{StaticInt{3}}}, iter)` collects three elements into a vector of static length;
-* [`FixedSizeArrays.wrap`](@ref) wraps an existing memory backend without copying, with the dimensions given as `StaticInt`s.
+* the `undef` constructor `FixedSizeArrayDims{T}(undef, dims)` makes static the dimensions given as `Val(n)` or `static(n)`, and dynamic those given as `Int`s, as in the example above;
+* the converting constructor and [`collect_as`](@ref "The `collect_as` utility") need the dimensions type: `FixedSizeArrayDims{Float64, 2, Tuple{Val{2}, Int}}(arr)` copies the matrix `arr` into an array whose first dimension is static, and `collect_as(FixedSizeArrayDims{Int, 1, Tuple{Val{3}}}, iter)` collects three elements into a vector of static length;
+* [`FixedSizeArrays.wrap`](@ref) wraps an existing memory backend without copying, with the dimensions given as `Val`s or `StaticInt`s.
 
 ```jldoctest
 julia> using FixedSizeArrays: FixedSizeArrays, FixedSizeArrayDims
 
-julia> using Static: static, StaticInt
-
 julia> using Collects: collect_as
 
-julia> a = FixedSizeArrayDims{Float64, 2, Tuple{StaticInt{2}, Int}}([1 2 3; 4 5 6]);  # copy from a matrix
+julia> a = FixedSizeArrayDims{Float64, 2, Tuple{Val{2}, Int}}([1 2 3; 4 5 6]);  # copy from a matrix
 
 julia> size(a), size(a, 1)
 ((2, 3), 2)
 
-julia> b = collect_as(FixedSizeArrayDims{Int, 1, Tuple{StaticInt{3}}}, (i^2 for i in 1:3));  # from an iterator
+julia> b = collect_as(FixedSizeArrayDims{Int, 1, Tuple{Val{3}}}, (i^2 for i in 1:3));  # from an iterator
 
 julia> b == [1, 4, 9]
 true
 
 julia> v = collect(1.0:12.0);
 
-julia> c = FixedSizeArrays.wrap(FixedSizeArrayDims, v, (static(2), static(3), :));  # wrap, computing the last dimension
+julia> c = FixedSizeArrays.wrap(FixedSizeArrayDims, v, (Val(2), Val(3), :));  # wrap, computing the last dimension
 
 julia> size(c), parent(c) === v
 ((2, 3, 2), true)
 
-julia> d = FixedSizeArrayDims{Int}(undef, (5, static(3)));  # a static dimension after a dynamic one
+julia> d = FixedSizeArrayDims{Int}(undef, (5, Val(3)));  # a static dimension after a dynamic one
 
 julia> size(d)
 (5, 3)
 ```
 
-When the type of the array specifies the dimensions type, the dimensions given to the constructor or to `wrap` are converted to it: `FixedSizeArray{Float64}(undef, (static(2), 3))` has two dynamic dimensions, since a `FixedSizeArray` has only dynamic dimensions, while `FixedSizeArrayDims{Float64}(undef, (static(2), 3))` has a static one.
+When the type of the array specifies the dimensions type, the dimensions given to the constructor or to `wrap` are converted to it: `FixedSizeArray{Float64}(undef, (Val(2), 3))` has two dynamic dimensions, since a `FixedSizeArray` has only dynamic dimensions, while `FixedSizeArrayDims{Float64}(undef, (Val(2), 3))` has a static one.
 
 ### Operations which preserve the static dimensions
 
@@ -198,9 +216,7 @@ julia> using FixedSizeArrays
 
 julia> using FixedSizeArrays: FixedSizeArrayDims
 
-julia> using Static: static
-
-julia> a = FixedSizeArrayDims{Float64}(undef, (static(2), 3));
+julia> a = FixedSizeArrayDims{Float64}(undef, (Val(2), 3));
 
 julia> typeof(similar(a)) === typeof(a)  # keeps the static dimension
 true
@@ -223,7 +239,7 @@ The package has [extensions](https://pkgdocs.julialang.org/v1/creating-packages/
   `FixedSizeArrayDims` itself is not an `adapt` target: `adapt(FixedSizeArrayDims, x)` returns `x` unchanged, since the static dimensions can not be derived from `x`, use the [constructors](@ref "Constructing arrays with static dimensions") instead;
 * [MPI.jl](https://github.com/JuliaParallel/MPI.jl) (v0.20.28 or later): the arrays of this package, and `SubArray`s of them, can be used directly as communication buffers in MPI operations, e.g. `MPI.Send`, `MPI.Recv!`, `MPI.Bcast!`, `MPI.Allreduce!` and `MPI.Gatherv!`;
 * [Random.jl](https://docs.julialang.org/en/v1/stdlib/Random/): `rand!(a)` fills the array in place;
-* [Static.jl](https://github.com/SciML/Static.jl): enables the [static dimensions](@ref "Static dimensions: the `FixedSizeArrayDims` type");
+* [Static.jl](https://github.com/SciML/Static.jl): enables the `StaticInt` [static dimensions](@ref "Static dimensions: the `FixedSizeArrayDims` type") (`Val` dimensions need no extension);
 * [StaticArrayInterface.jl](https://github.com/JuliaArrays/StaticArrayInterface.jl), together with Static.jl: the static sizes and strides of an array with static dimensions, and the device of its memory backend, are made available to the packages which use this interface, such as LoopVectorization.jl, StrideArraysCore.jl and Polyester.jl.
 
 ## The `collect_as` utility
