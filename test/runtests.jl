@@ -600,6 +600,16 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                     test_inferred(bm, TMF, (vm22, mf22))
                     test_inferred(bm, TMF, (mf22, vm22))
                 end
+                @testset "aliasing" begin
+                    v = TVI(1:4)
+                    c = @inferred Base.unaliascopy(v)
+                    @test c isa TVI
+                    @test c == v
+                    @test parent(c) !== parent(v)
+                    # overlapping source and destination are unaliased with `unaliascopy`
+                    @views v[2:4] .= v[1:3]
+                    @test v == [1, 1, 2, 3]
+                end
             end
 
             @testset "`isassigned`" begin

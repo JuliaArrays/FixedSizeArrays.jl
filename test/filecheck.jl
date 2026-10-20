@@ -498,6 +498,19 @@ build_is_production_build &&
         end
     end
 
+    @testset "broadcasting does not call the `@noinline` generic `unaliascopy`" begin
+        @test @filecheck begin
+            @check "define"
+            @check_not "unaliascopy"
+            code_llvm(fc_broadcast_scale!, (FixedSizeVectorDefault{Float64}, Float64, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        end
+        @test @filecheck begin
+            @check "define"
+            @check_not "unaliascopy"
+            code_llvm(fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+        end
+    end
+
     fc_run_bounds_check_elision_checks && VERSION >= v"1.13" &&
     @testset "loops without `@inbounds` are vectorized" begin
         @testset "stores (issue #70)" begin
