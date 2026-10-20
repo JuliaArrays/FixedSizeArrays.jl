@@ -8,8 +8,15 @@ using InteractiveUtils: code_llvm
 # Print the LLVM IR of `f` for the argument types `types`, for `@filecheck`.
 fc_llvm(f, types) = code_llvm(f, types; debuginfo=:none)
 
+# Runtime entry point allocating a `Memory`.
+const fc_alloc_memory = "jl_alloc_genericmemory"
 # FileCheck regex matching any runtime heap-allocation entry point, across Julia versions.
 const fc_alloc_call = "{{(i?jl_gc_(small|pool|big)_alloc|i?jl_alloc_(genericmemory|array))}}"
+# Bulk memory copy.
+const fc_memmove = "memmove"
+# Body of a vectorized loop, and a SIMD vector of `Float64`s.
+const fc_vector_body = "vector.body"
+const fc_vector_double = "<{{[0-9]+}} x double>"
 # `Int` is `i32` on 32-bit platforms.
 const fc_int = "i$(Sys.WORD_SIZE)"
 # Alternatives of a FileCheck regex matching a call to throw a bounds error, across Julia
@@ -20,7 +27,7 @@ const fc_bounds_error = "{{$fc_bounds_error_alternatives}}"
 const fc_bounds_error_or_int_load = "{{$fc_bounds_error_alternatives|load $fc_int}}"
 # FileCheck regex matching a bounds error or the body of a vectorized loop, for operations
 # which must be a bulk memory copy instead.
-const fc_bounds_error_or_loop = "{{$fc_bounds_error_alternatives|vector.body}}"
+const fc_bounds_error_or_loop = "{{$fc_bounds_error_alternatives|$fc_vector_body}}"
 
 # Elimination of the heap allocation of the underlying `Memory` only works reliably from
 # Julia 1.12 on, and requires bounds checking not to be forced on.
@@ -515,7 +522,7 @@ build_is_production_build &&
                 @check "define"
                 @check_not fc_alloc_call
                 @check_not fc_bounds_error
-                @check "fadd <{{[0-9]+}} x double>"
+                @check "fadd $fc_vector_double"
                 @check_not fc_alloc_call
                 @check_not fc_bounds_error
                 @check "ret void"
@@ -537,7 +544,7 @@ build_is_production_build &&
             @test (@filecheck dump_input=dump_input begin
                 @check "define"
                 @check_not fc_bounds_error
-                @check "store <{{[0-9]+}} x double>"
+                @check "store $fc_vector_double"
                 fc_llvm(fill!, (A, Float64))
             end) skip=skipped
         end
@@ -560,10 +567,10 @@ build_is_production_build &&
     @testset "out-of-place broadcasting: one allocation, no aliasing check" begin
         @test @filecheck begin
             @check "define"
-            @check_not "memmove"
-            @check "jl_alloc_genericmemory"
-            @check_not "{{memmove|jl_alloc_genericmemory}}"
-            code_llvm(fc_broadcast_oop, (FixedSizeVectorDefault{Float64},); debuginfo=:none)
+            @check_not fc_memmove
+            @check fc_alloc_memory
+            @check_not "{{$fc_memmove|$fc_alloc_memory}}"
+            fc_llvm(fc_broadcast_oop, (FixedSizeVectorDefault{Float64},))
         end
     end
 
@@ -571,12 +578,12 @@ build_is_production_build &&
         @test @filecheck begin
             @check "define"
             @check_not "unaliascopy"
-            code_llvm(fc_broadcast_scale!, (FixedSizeVectorDefault{Float64}, Float64, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+            fc_llvm(fc_broadcast_scale!, (FixedSizeVectorDefault{Float64}, Float64, FixedSizeVectorDefault{Float64}))
         end
         @test @filecheck begin
             @check "define"
             @check_not "unaliascopy"
-            code_llvm(fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}); debuginfo=:none)
+            fc_llvm(fc_broadcast_copy!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}))
         end
     end
 
@@ -586,7 +593,7 @@ build_is_production_build &&
             @test @filecheck begin
                 @check "define"
                 @check_not fc_bounds_error
-                @check "store <{{[0-9]+}} x double>"
+                @check "store $fc_vector_double"
                 @check_not fc_bounds_error
                 fc_llvm(fc_store_loop!, (FixedSizeVectorDefault{Float64},))
             end
@@ -595,8 +602,8 @@ build_is_production_build &&
             @test @filecheck begin
                 @check "define"
                 @check_not fc_bounds_error
-                @check "vector.body"
-                @check "<{{[0-9]+}} x double>"
+                @check fc_vector_body
+                @check fc_vector_double
                 @check_not fc_bounds_error
                 fc_llvm(fc_simd_ivdep!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}, Float64))
             end
@@ -700,9 +707,9 @@ build_is_production_build &&
             @test @filecheck begin
                 @check "define"
                 @check_not fc_bounds_error_or_loop
-                @check "jl_alloc_genericmemory"
+                @check fc_alloc_memory
                 @check_not fc_bounds_error_or_loop
-                @check "memmove"
+                @check fc_memmove
                 @check_not fc_bounds_error_or_loop
                 @check "ret void"
                 fc_llvm(f, (T,))
@@ -716,9 +723,9 @@ build_is_production_build &&
         # Inspect `copyto!` directly: in a wrapper the call to it may not be inlined.
         @test @filecheck begin
             @check "define"
-            @check_not "vector.body"
-            @check "memmove"
-            @check_not "vector.body"
+            @check_not fc_vector_body
+            @check fc_memmove
+            @check_not fc_vector_body
             @check "ret"
             fc_llvm(copyto!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}))
         end
