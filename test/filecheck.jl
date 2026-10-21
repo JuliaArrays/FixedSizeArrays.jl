@@ -583,9 +583,7 @@ build_is_production_build &&
             ("`Val` dimensions", fc_val_dims_array, false),
             ("view", fc_fill_view, fc_fill_view_bounds_check_skipped),
         )
-            # Do not print the FileCheck diagnostic while the test is known to be broken.
-            dump_input = skipped ? "never" : "fail"
-            @test (@filecheck dump_input=dump_input begin
+            @test (@filecheck begin
                 @check "define"
                 @check_not fc_bounds_error
                 @check "store $fc_vector_double"
