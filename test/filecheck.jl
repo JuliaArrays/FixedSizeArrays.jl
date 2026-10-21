@@ -669,13 +669,15 @@ build_is_production_build &&
                 @check "{{^}}}"
                 fc_llvm(f, (A, args...))
             end) skip=(f !== fc_sum_loop && !fc_run_unchecked_eachindex_checks)
-            # Before Julia 1.13 loops without `@inbounds` are not vectorized.
+            # Before Julia 1.13 loops without `@inbounds` are not vectorized.  The sum of
+            # floating-point numbers can be vectorized only as an ordered reduction, which
+            # LLVM finds profitable on some targets (e.g. aarch64) but not on others (x86-64).
             @test (@filecheck begin
                 @check "define"
                 @check fc_vector_body
                 @check fc_vector_double
                 fc_llvm(f, (A, args...))
-            end) skip=(VERSION < v"1.13")
+            end) skip=(VERSION < v"1.13" || f === fc_sum_loop)
         end
     end
 
