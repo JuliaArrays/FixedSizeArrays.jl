@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * `FixedSizeArray{T,N,Mem}` is an alias for `FixedSizeArrayDims{T,N,NTuple{N,Int},Mem}` (see above). It is still a concrete type, with the same layout and methods as before, but `FixedSizeArray` itself is no longer the name of a `struct`: `Base.typename(FixedSizeArray)` is `FixedSizeArrayDims`, and `FixedSizeArray{T,N}` with an invalid `N` (e.g. `FixedSizeArray{Int,-1}`) now throws an error when the type is formed.
+* Cartesian `getindex` and `setindex!` with one `Int` index per dimension compute the linear index in Horner form, `i1 + n1 * ((i2 - 1) + n2 * (...))`, instead of a sum of strided terms, `1 + (i1 - 1) + n1 * (i2 - 1) + (n1 * n2) * (...)`. This needs fewer integer operations, e.g. in kernels accessing all elements `u[v, i, j, k]` along the first dimension. ([#217](https://github.com/JuliaArrays/FixedSizeArrays.jl/pull/217))
 
 ### Fixed
 
