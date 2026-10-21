@@ -1108,6 +1108,31 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
        end[] == NTuple{3, Int}
     end
 
+    @testset "Cartesian indexing with `Int`s" begin
+        # Cartesian `getindex`/`setindex!` compute the linear index themselves (in Horner
+        # form), so compare against `LinearIndices`, with odd sizes, size-1 dimensions, and a
+        # static first dimension.
+        for dims in ((7,), (3, 5), (3, 1, 5), (5, 4, 3, 2), (3, 5, 1, 7, 2)), T in (Float64, Int16)
+            for a in (FixedSizeArray{T}(undef, dims), wrap(FixedSizeArray, Vector{T}(undef, prod(dims)), dims),
+                      wrap(FixedSizeArrayDims, Vector{T}(undef, prod(dims)), (Val(dims[1]), Base.tail(dims)...)))
+                a .= reshape(1:length(a), dims)
+                li = LinearIndices(a)
+                for I in CartesianIndices(a)
+                    @test a[Tuple(I)...] == li[I]
+                    a[Tuple(I)...] = -li[I]
+                    @test a[li[I]] == -li[I]
+                end
+                for bad in (ntuple(Returns(0), length(dims)), dims .+ 1,
+                            ntuple(d -> d == length(dims) ? dims[d] + 1 : 1, length(dims)))
+                    @test_throws BoundsErrorLight a[bad...]
+                    @test_throws BoundsErrorLight (a[bad...] = 1)
+                end
+                # trailing indices keep the `AbstractArray` behavior
+                @test a[ntuple(Returns(1), length(dims))..., 1] == -1   # first element, set to -1 above
+            end
+        end
+    end
+
     @testset "`size` loads all dimensions at once" begin
         # `size` must stay inferable and foldable, while passing each dimension through an
         # intrinsic, see the comment at its definition (and issue #201).

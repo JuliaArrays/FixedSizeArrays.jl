@@ -122,6 +122,10 @@ const fc_val_dims_array = FixedSizeArrayDims{Float64, 3, Tuple{Val{5}, Val{4}, I
 const fc_static_dims_arrays = (fc_static_dims_array, fc_val_dims_array)
 fc_getindex(A, i, j, k) = A[i, j, k]
 fc_getindex_inbounds(A, i, j, k) = @inbounds A[i, j, k]
+
+# All variables `u[v, i, j, k]` of a node, as in the flux-differencing kernels of Trixi.jl.
+fc_node_sum(u, i, j, k) = @inbounds u[1, i, j, k] + u[2, i, j, k] + u[3, i, j, k] + u[4, i, j, k] + u[5, i, j, k]
+const fc_node_val_dims_array = FixedSizeArrayDims{Float64, 4, Tuple{Val{5}, Int, Int, Int}, FixedSizeArrays.default_underlying_storage_type{Float64}}
 fc_setindex_inbounds!(A, i, j, k, x) = (@inbounds A[i, j, k] = x; nothing)
 
 # Loop over `eachindex`.
@@ -502,6 +506,20 @@ build_is_production_build &&
                 @check "ret void"
                 fc_llvm(fc_setindex_inbounds!, (A, Int, Int, Int, Float64))
             end
+        end
+    end
+
+    fc_run_bounds_check_elision_checks &&
+    @testset "elements along the first dimension share one offset: $(A)" for A in (FixedSizeArrayDefault{Float64, 4}, fc_node_val_dims_array)
+        # The offset of the node is computed once, before the first load, and the other
+        # variables are at constant offsets from it: no multiplication after the first load.
+        # (On Julia 1.11 the first two loads are one vector load.)
+        @test @filecheck begin
+            @check "define"
+            @check "load {{(<2 x )?}}double"
+            @check_not "{{mul|shl}}"
+            @check "ret double"
+            fc_llvm(fc_node_sum, (A, Int, Int, Int))
         end
     end
 
