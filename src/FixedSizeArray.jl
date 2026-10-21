@@ -620,20 +620,6 @@ for A ∈ (Array, optional_generic_memory...)  # Add more? Too bad we have to ha
     end
 end
 
-# `fill!`: loop over the parent, as the generic fallback, iterating over `eachindex` of the
-# array itself, does not elide the bounds checks on Julia v1.13 and later, so does not
-# vectorize: <https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200>.
-# Forwarding to `fill!` of the parent instead is slower for short arrays on these versions.
-
-function Base.fill!(a::FixedSizeArrayDims{T}, x) where {T}
-    xT = x isa T ? x : convert(T, x)::T
-    mem = parent(a)
-    for i ∈ eachindex(mem)
-        @inbounds mem[i] = xT
-    end
-    a
-end
-
 # `copy!`: avoid the `resize!` branch of `copy!(::AbstractVector, ::AbstractVector)`
 
 function Base.copy!(dst::FixedSizeArrayDims{<:Any, 1}, src::AbstractVector)
