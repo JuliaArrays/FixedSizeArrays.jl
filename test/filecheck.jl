@@ -378,9 +378,11 @@ build_is_production_build &&
                 @check "define"
                 @check_not "gcframe"
                 @check_not fc_alloc_call
-                @check "store $fc_int 1"
-                @check "store $fc_int 2"
-                @check "store $fc_int 3"
+                # Consecutive stores may be merged into a vector store, e.g. on aarch64
+                # `store <2 x i64> <i64 1, i64 2>`.
+                @check "store {{.*}}$fc_int 1,"
+                @check "$fc_int 2{{[,>]}}"
+                @check "$fc_int 3{{[,>]}}"
                 @check_not fc_alloc_call
                 @check "ret void"
                 fc_llvm(fc_splat, ())
