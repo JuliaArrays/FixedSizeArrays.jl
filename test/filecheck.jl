@@ -51,6 +51,10 @@ const fc_run_bounds_error_name_checks = fc_run_bounds_check_elision_checks && VE
 # this problem.  (`v"1.13-"` to include the prereleases of v1.13.)
 const fc_fill_view_bounds_check_skipped = VERSION >= v"1.13-"
 
+# Before Julia 1.12 LLVM fully unrolls the loops over the static dimensions in in-place
+# broadcasting, and does not vectorize the resulting scalar code.
+const fc_broadcast_static_dims_vectorization_skipped = VERSION < v"1.12"
+
 # Before Julia 1.13 `copy` went through a loop with a bounds check and two allocations.
 const fc_run_copy_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.13"
 
@@ -559,12 +563,15 @@ build_is_production_build &&
                 @check "define"
                 @check_not fc_alloc_call
                 @check_not fc_bounds_error
-                @check "fadd $fc_vector_double"
-                @check_not fc_alloc_call
-                @check_not fc_bounds_error
-                @check "ret void"
+                @check "{{^}}}"
                 fc_llvm(fc_broadcast!, (A,))
             end
+            skipped = fc_broadcast_static_dims_vectorization_skipped && A in fc_static_dims_arrays
+            @test (@filecheck begin
+                @check "define"
+                @check "fadd $fc_vector_double"
+                fc_llvm(fc_broadcast!, (A,))
+            end) skip=skipped
         end
     end
 
