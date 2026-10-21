@@ -57,6 +57,15 @@ const fc_run_copy_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.
 # follow.  The LLVM names of the loads (`%"[2]_ptr`) match from Julia 1.12 on.
 const fc_run_size_reload_checks = VERSION >= v"1.12"
 
+# https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/142: a `FixedSizeArray` argument is
+# passed as a pointer to its fields and a separate pointer to its GC roots (the `Memory`).
+# Up to Julia 1.13.0, codegen eagerly loaded the roots of an argument and copied them to a
+# new stack slot for each non-inlined call passing the argument on, e.g. in the recursive
+# `Base.mapreduce_impl` used by `sum`, unlike for `Array`.  Since JuliaLang/julia#60388
+# (backported to v1.13.1) the roots are tracked lazily, and the incoming pointer to them is
+# forwarded as is.
+const fc_run_roots_forwarding_checks = VERSION >= v"1.13.1"
+
 # Constant folding of `length` through a `@noinline` call.
 @noinline fc_len(A::AbstractArray) = length(A)
 fc_len_fsv() = fc_len(FixedSizeVector{Float64}(undef, 3))
@@ -252,6 +261,12 @@ fc_copy_constructor(A) = FixedSizeArray(A)
 # `copy!` into a `FixedSizeVector`, which used to fall back to `resize!`, see issue #194 and
 # PR #195.
 fc_copy!(dst, src) = copy!(dst, src)
+
+# Recursive function passing on its array argument, see issue #142.
+@noinline function fc_recurse(A::AbstractArray, n::Int)
+    n <= 0 && return 0.0
+    return fc_recurse(A, n - 1) + fc_recurse(A, n - 2)
+end
 
 # The IR of a build instrumented for code coverage is not representative.
 build_is_production_build &&
@@ -755,6 +770,20 @@ build_is_production_build &&
             @check "define"
             @check_not "{{apply_generic|methoderror}}"
             fc_llvm(fc_copy!, (FixedSizeVectorDefault{Float64}, Vector{Float64}))
+        end
+    end
+
+    fc_run_roots_forwarding_checks &&
+    @testset "recursive calls forward the GC roots of the argument (issue #142)" begin
+        # No stack slots for copies of the roots, and both recursive calls pass on the
+        # pointer to the roots received as argument.
+        @test @filecheck begin
+            @check "define"
+            @check_not "{{alloca|gcframe}}"
+            @check_count 2 "call double @{{.*}}fc_recurse{{.*}} %.roots.A, "
+            @check_not "{{alloca|gcframe}}"
+            @check "}"
+            fc_llvm(fc_recurse, (FixedSizeVectorDefault{Float64}, Int))
         end
     end
 end
