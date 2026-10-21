@@ -14,9 +14,11 @@ const fc_alloc_memory = "jl_alloc_genericmemory"
 const fc_alloc_call = "{{(i?jl_gc_(small|pool|big)_alloc|i?jl_alloc_(genericmemory|array))}}"
 # Bulk memory copy.
 const fc_memmove = "memmove"
-# Body of a vectorized loop, and a SIMD vector of `Float64`s.
+# Body of a vectorized loop, and a SIMD vector of elements of LLVM type `T`, possibly a
+# scalable one (e.g. `<vscale x 2 x double>`).
 const fc_vector_body = "vector.body"
-const fc_vector_double = "<{{[0-9]+}} x double>"
+fc_vector(T) = "<{{(vscale x )?[0-9]+}} x $T>"
+const fc_vector_double = fc_vector("double")
 # `Int` is `i32` on 32-bit platforms.
 const fc_int = "i$(Sys.WORD_SIZE)"
 # Alternatives of a FileCheck regex matching a call to throw a bounds error, across Julia
@@ -378,9 +380,11 @@ build_is_production_build &&
                 @check "define"
                 @check_not "gcframe"
                 @check_not fc_alloc_call
-                @check "store $fc_int 1"
-                @check "store $fc_int 2"
-                @check "store $fc_int 3"
+                # Consecutive stores may be merged into a vector store, e.g. on aarch64
+                # `store <2 x i64> <i64 1, i64 2>`.
+                @check "store {{.*}}$fc_int 1,"
+                @check "$fc_int 2{{[,>]}}"
+                @check "$fc_int 3{{[,>]}}"
                 @check_not fc_alloc_call
                 @check "ret void"
                 fc_llvm(fc_splat, ())
@@ -645,11 +649,14 @@ build_is_production_build &&
 
     fc_run_bounds_check_elision_checks &&
     @testset "loop over `eachindex` of an N-d array: no bounds check, no division (PR #6)" begin
-        # Linear indexing: no conversion of the index to Cartesian indices.
+        # Linear indexing: no conversion of the index to Cartesian indices, which would
+        # need a division.  An unsigned remainder alone can come from the loop vectorizer,
+        # which computes the number of leftover iterations with `urem` when the width of the
+        # vectors is not a compile-time constant, as with scalable vectors.
         @testset "N = $N" for N in 1:3
             @test @filecheck begin
                 @check "define"
-                @check_not "{{$fc_bounds_error_alternatives|sdiv|udiv|srem|urem}}"
+                @check_not "{{$fc_bounds_error_alternatives|sdiv|udiv|srem}}"
                 @check "ret double"
                 fc_llvm(fc_sum_loop, (FixedSizeArrayDefault{Float64, N},))
             end
@@ -661,7 +668,7 @@ build_is_production_build &&
         @test @filecheck begin
             @check "define"
             @check_not fc_bounds_error
-            @check "add <{{[0-9]+}} x i8>"
+            @check "add $(fc_vector("i8"))"
             @check_not fc_bounds_error
             @check "ret i8"
             fc_llvm(fc_iterate_sum, (FixedSizeVectorDefault{Int8},))

@@ -67,6 +67,16 @@ jobs:
             julia_arch: default
             os: ubuntu-latest
             build_is_production_build: true
+          - julia_check_bounds: "auto"
+            julia_version: '1'
+            julia_arch: default
+            os: ubuntu-26.04-arm
+            build_is_production_build: true
+          - julia_check_bounds: "auto"
+            julia_version: 'pre'
+            julia_arch: default
+            os: ubuntu-26.04-arm
+            build_is_production_build: true
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v7
@@ -74,6 +84,7 @@ jobs:
       with:
         arch: ${{ matrix.julia_arch }}
         version: ${{ matrix.julia_version }}
+        show-versioninfo: true
     - uses: julia-actions/cache@v3
     - uses: julia-actions/julia-runtest@v1
       env:
@@ -81,6 +92,7 @@ jobs:
       with:
         check_bounds: ${{ matrix.julia_check_bounds }}
         coverage: false
+
   test-with-code-coverage:
     name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - with code coverage
     timeout-minutes: 20
@@ -101,6 +113,7 @@ jobs:
     - uses: julia-actions/setup-julia@v3
       with:
         version: ${{ matrix.julia_version }}
+        show-versioninfo: true
     - uses: julia-actions/cache@v3
     - uses: julia-actions/julia-runtest@v1
       env:
