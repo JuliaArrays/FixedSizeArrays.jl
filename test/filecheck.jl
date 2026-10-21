@@ -60,6 +60,11 @@ const fc_fill_slices_skipped = VERSION < v"1.11" || v"1.13-" <= VERSION < v"1.14
 # broadcasting, and does not vectorize the resulting scalar code.
 const fc_broadcast_static_dims_vectorization_skipped = VERSION < v"1.12"
 
+# Where `Base.unchecked_oneto` is defined (Julia 1.11 on), `eachindex` of a `FixedSizeArray`
+# does not clamp the length with `max(0, length(a))`, which lets LLVM elide the bounds checks
+# of loops over `eachindex` storing into the array.
+const fc_run_unchecked_eachindex_checks = fc_run_bounds_check_elision_checks && isdefined(Base, :unchecked_oneto)
+
 # Before Julia 1.13 `copy` went through a loop with a bounds check and two allocations.
 const fc_run_copy_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.13"
 
@@ -131,6 +136,10 @@ fc_reshape_4() = fc_reshape(FixedSizeVector{Float64}(undef, 4))
 const fc_fill_array = FixedSizeArrayDefault{Float64, 5}
 const fc_fill_view = typeof(view(fc_fill_array(undef, 1, 1, 1, 1, 1), :, :, :, :, 1))
 fc_fill_slices!(A, x) = (for e in axes(A, 5); fill!(view(A, :, :, :, :, e), x); end; nothing)
+
+# Loops over `eachindex` storing into the array, without `@inbounds`.
+fc_fill_loop!(A, x) = (for i in eachindex(A); A[i] = x; end; nothing)
+fc_increment_loop!(A) = (for i in eachindex(A); A[i] += 1; end; nothing)
 
 # Scalar indexing.
 fc_getindex(A, i) = A[i]
@@ -682,6 +691,26 @@ build_is_production_build &&
                 @check_not "{{$fc_bounds_error_alternatives|sdiv|udiv|srem}}"
                 @check "ret double"
                 fc_llvm(fc_sum_loop, (FixedSizeArrayDefault{Float64, N},))
+            end
+        end
+    end
+
+    fc_run_unchecked_eachindex_checks &&
+    @testset "loop over `eachindex` storing into an N-d array: no bounds check, vectorized" begin
+        arrays = (FixedSizeArrayDefault{Float64, 1}, FixedSizeArrayDefault{Float64, 2},
+                  FixedSizeArrayDefault{Float64, 3}, fc_static_dims_arrays...)
+        @testset "$(f) $(A)" for (f, args) in ((fc_fill_loop!, (Float64,)), (fc_increment_loop!, ())), A in arrays
+            @test @filecheck begin
+                @check "define"
+                @check_not fc_bounds_error
+                @check "{{^}}}"
+                fc_llvm(f, (A, args...))
+            end
+            # Before Julia 1.13 loops without `@inbounds` are not vectorized.
+            VERSION >= v"1.13" && @test @filecheck begin
+                @check "define"
+                @check "store $fc_vector_double"
+                fc_llvm(f, (A, args...))
             end
         end
     end

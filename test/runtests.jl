@@ -393,6 +393,17 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                 end
             end
 
+            @testset "`eachindex`" begin
+                for dim_count ∈ 0:3, len ∈ (0, 3)
+                    a = FSA{Float64, dim_count}(undef, ntuple(Returns(len), dim_count))
+                    @test eachindex(a) === Base.OneTo(length(a))
+                    @test eachindex(IndexLinear(), a) === Base.OneTo(length(a))
+                    @test eachindex(a, similar(a)) === Base.OneTo(length(a))
+                    test_inferred_noalloc(eachindex, Base.OneTo{Int}, (a,))
+                end
+                @test_throws DimensionMismatch eachindex(FSV{Int}(undef, 2), FSM{Int}(undef, 1, 3))
+            end
+
             @testset "`FixedSizeArrays.wrap`" begin
                 # `T` must be a static parameter here rather than a variable captured from the
                 # `for T` loop below: a closure capturing `T` holds it as a `DataType`, so the

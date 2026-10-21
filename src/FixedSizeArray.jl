@@ -768,6 +768,17 @@ function wrap(::Type{FSA}, parent::DenseVector) where {FSA <: FixedSizeArrayDims
     wrap(FSA, parent, (length(parent),))
 end
 
+if isdefined(Base, :unchecked_oneto) && (Base.unchecked_oneto isa Function)
+    # This is an internal, non-public function, which Base uses for `Array` and `Memory`.
+    # The generic `eachindex` is `OneTo(length(a))`, which clamps the length with
+    # `max(0, length(a))`: LLVM does not see through it in loops over `eachindex` which
+    # store into the array, so it keeps their bounds checks and does not vectorize them.
+    # The length of a `FixedSizeArray` is never negative, `checked_dims` guarantees it.
+    Base.eachindex(::IndexLinear, a::FixedSizeArrayDims) = Base.unchecked_oneto(length(a))
+    # Avoid an ambiguity with `eachindex(::IndexLinear, ::AbstractVector)`.
+    Base.eachindex(::IndexLinear, a::FixedSizeArrayDims{<:Any, 1}) = Base.unchecked_oneto(length(a))
+end
+
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods (copied from `Base.Array`)
 
 Base.iterate(A::FixedSizeArrayDims, i=1) = (@inline; (i - 1)%UInt < length(A)%UInt ? (@inbounds A[i], i + 1) : nothing)
