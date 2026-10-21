@@ -137,7 +137,15 @@ const fc_fill_array = FixedSizeArrayDefault{Float64, 5}
 const fc_fill_view = typeof(view(fc_fill_array(undef, 1, 1, 1, 1, 1), :, :, :, :, 1))
 fc_fill_slices!(A, x) = (for e in axes(A, 5); fill!(view(A, :, :, :, :, e), x); end; nothing)
 
-# Loops over `eachindex` storing into the array, without `@inbounds`.
+# Loops over `eachindex` without `@inbounds`: reading the array, storing into it, or both.
+function fc_sum_loop(A)
+    s = zero(eltype(A))
+    for i in eachindex(A)
+        s += A[i]
+    end
+    return s
+end
+fc_store_loop!(A) = (for i in eachindex(A); A[i] = i; end; nothing)
 fc_fill_loop!(A, x) = (for i in eachindex(A); A[i] = x; end; nothing)
 fc_increment_loop!(A) = (for i in eachindex(A); A[i] += 1; end; nothing)
 
@@ -157,15 +165,6 @@ fc_getindex_inbounds(A, i, j, k) = @inbounds A[i, j, k]
 fc_node_sum(u, i, j, k) = @inbounds u[1, i, j, k] + u[2, i, j, k] + u[3, i, j, k] + u[4, i, j, k] + u[5, i, j, k]
 const fc_node_val_dims_array = FixedSizeArrayDims{Float64, 4, Tuple{Val{5}, Int, Int, Int}, FixedSizeArrays.default_underlying_storage_type{Float64}}
 fc_setindex_inbounds!(A, i, j, k, x) = (@inbounds A[i, j, k] = x; nothing)
-
-# Loop over `eachindex`.
-function fc_sum_loop(A)
-    s = zero(eltype(A))
-    for i in eachindex(A)
-        s += A[i]
-    end
-    return s
-end
 
 # In-place broadcasting.
 fc_broadcast!(A) = (A .= A .+ A; nothing)
@@ -216,14 +215,6 @@ function fc_fill_reduce_2d(n, i, j)
     fill!(a, n)
     a[i, j] = 0
     return sum(a)
-end
-
-# Stores in a loop without `@inbounds`, see issue #70 and PR #68.
-function fc_store_loop!(v)
-    for i in eachindex(v)
-        v[i] = i
-    end
-    return nothing
 end
 
 # `@simd ivdep` loop over `eachindex` of two arrays, see issue #152.
@@ -562,16 +553,6 @@ build_is_production_build &&
     end
 
     fc_run_bounds_check_elision_checks &&
-    @testset "loop over `eachindex` has no bounds check" begin
-        @test @filecheck begin
-            @check "define"
-            @check_not fc_bounds_error
-            @check "ret double"
-            fc_llvm(fc_sum_loop, (FixedSizeVectorDefault{Float64},))
-        end
-    end
-
-    fc_run_bounds_check_elision_checks &&
     @testset "in-place broadcasting: no allocation, no bounds check, vectorized" begin
         @testset "$(A)" for A in (FixedSizeVectorDefault{Float64}, fc_static_dims_arrays...)
             @test @filecheck begin
@@ -658,15 +639,6 @@ build_is_production_build &&
 
     fc_run_bounds_check_elision_checks && VERSION >= v"1.13" &&
     @testset "loops without `@inbounds` are vectorized" begin
-        @testset "stores (issue #70)" begin
-            @test @filecheck begin
-                @check "define"
-                @check_not fc_bounds_error
-                @check "store $fc_vector_double"
-                @check_not fc_bounds_error
-                fc_llvm(fc_store_loop!, (FixedSizeVectorDefault{Float64},))
-            end
-        end
         @testset "`@simd ivdep` over `eachindex` of two arrays (issue #152)" begin
             @test @filecheck begin
                 @check "define"
@@ -680,38 +652,30 @@ build_is_production_build &&
     end
 
     fc_run_bounds_check_elision_checks &&
-    @testset "loop over `eachindex` of an N-d array: no bounds check, no division (PR #6)" begin
-        # Linear indexing: no conversion of the index to Cartesian indices, which would
-        # need a division.  An unsigned remainder alone can come from the loop vectorizer,
-        # which computes the number of leftover iterations with `urem` when the width of the
-        # vectors is not a compile-time constant, as with scalable vectors.
-        @testset "N = $N" for N in 1:3
-            @test @filecheck begin
-                @check "define"
-                @check_not "{{$fc_bounds_error_alternatives|sdiv|udiv|srem}}"
-                @check "ret double"
-                fc_llvm(fc_sum_loop, (FixedSizeArrayDefault{Float64, N},))
-            end
-        end
-    end
-
-    fc_run_unchecked_eachindex_checks &&
-    @testset "loop over `eachindex` storing into an N-d array: no bounds check, vectorized" begin
+    @testset "loops over `eachindex`: no bounds check, no division, vectorized (issues #70, #200, PR #6)" begin
         arrays = (FixedSizeArrayDefault{Float64, 1}, FixedSizeArrayDefault{Float64, 2},
                   FixedSizeArrayDefault{Float64, 3}, fc_static_dims_arrays...)
-        @testset "$(f) $(A)" for (f, args) in ((fc_fill_loop!, (Float64,)), (fc_increment_loop!, ())), A in arrays
-            @test @filecheck begin
+        @testset "$(f) $(A)" for (f, args) in (
+                (fc_sum_loop, ()), (fc_store_loop!, ()), (fc_fill_loop!, (Float64,)), (fc_increment_loop!, ()),
+            ), A in arrays
+            # Linear indexing: no conversion of the index to Cartesian indices, which would
+            # need a division.  An unsigned remainder alone can come from the loop vectorizer,
+            # which computes the number of leftover iterations with `urem` when the width of
+            # the vectors is not a compile-time constant, as with scalable vectors.  Loops
+            # storing into the array need the unclamped `eachindex`, see above.
+            @test (@filecheck begin
                 @check "define"
-                @check_not fc_bounds_error
+                @check_not "{{$fc_bounds_error_alternatives|sdiv|udiv|srem}}"
                 @check "{{^}}}"
                 fc_llvm(f, (A, args...))
-            end
+            end) skip=(f !== fc_sum_loop && !fc_run_unchecked_eachindex_checks)
             # Before Julia 1.13 loops without `@inbounds` are not vectorized.
-            VERSION >= v"1.13" && @test @filecheck begin
+            @test (@filecheck begin
                 @check "define"
-                @check "store $fc_vector_double"
+                @check fc_vector_body
+                @check fc_vector_double
                 fc_llvm(f, (A, args...))
-            end
+            end) skip=(VERSION < v"1.13")
         end
     end
 
