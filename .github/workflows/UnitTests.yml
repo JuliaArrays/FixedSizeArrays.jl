@@ -67,6 +67,16 @@ jobs:
             julia_arch: default
             os: ubuntu-latest
             build_is_production_build: true
+          - julia_check_bounds: "auto"
+            julia_version: '1'
+            julia_arch: default
+            os: ubuntu-26.04-arm
+            build_is_production_build: true
+          - julia_check_bounds: "auto"
+            julia_version: 'pre'
+            julia_arch: default
+            os: ubuntu-26.04-arm
+            build_is_production_build: true
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v7
