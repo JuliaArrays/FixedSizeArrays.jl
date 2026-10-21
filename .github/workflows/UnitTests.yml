@@ -84,6 +84,7 @@ jobs:
       with:
         arch: ${{ matrix.julia_arch }}
         version: ${{ matrix.julia_version }}
+        show-versioninfo: true
     - uses: julia-actions/cache@v3
     - uses: julia-actions/julia-runtest@v1
       env:
@@ -91,6 +92,7 @@ jobs:
       with:
         check_bounds: ${{ matrix.julia_check_bounds }}
         coverage: false
+
   test-with-code-coverage:
     name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - with code coverage
     timeout-minutes: 20
@@ -111,6 +113,7 @@ jobs:
     - uses: julia-actions/setup-julia@v3
       with:
         version: ${{ matrix.julia_version }}
+        show-versioninfo: true
     - uses: julia-actions/cache@v3
     - uses: julia-actions/julia-runtest@v1
       env:
