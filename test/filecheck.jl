@@ -50,6 +50,11 @@ const fc_run_bounds_error_name_checks = fc_run_bounds_check_elision_checks && VE
 # `FixedSizeArray`s themselves have a `fill!` method of their own, which does not have
 # this problem.  (`v"1.13-"` to include the prereleases of v1.13.)
 const fc_fill_view_bounds_check_skipped = VERSION >= v"1.13-"
+# When `fill!` of views is inlined in a loop over the slices of an array (as in issue #200),
+# the bounds check is elided and the loop vectorized, except on Julia 1.10 and on Julia 1.13.
+# On 1.13, `IRCE` does not remove the bounds check because it runs before the loop is
+# cleaned up by `SimplifyCFG` and `InstCombine`, which JuliaLang/julia#63626 changed in 1.14.
+const fc_fill_slices_skipped = VERSION < v"1.11" || v"1.13-" <= VERSION < v"1.14.0-alpha1"
 
 # Before Julia 1.12 LLVM fully unrolls the loops over the static dimensions in in-place
 # broadcasting, and does not vectorize the resulting scalar code.
@@ -125,6 +130,7 @@ fc_reshape_4() = fc_reshape(FixedSizeVector{Float64}(undef, 4))
 # `fill!` on an array and on a view along its last dimension, see issue #200.
 const fc_fill_array = FixedSizeArrayDefault{Float64, 5}
 const fc_fill_view = typeof(view(fc_fill_array(undef, 1, 1, 1, 1, 1), :, :, :, :, 1))
+fc_fill_slices!(A, x) = (for e in axes(A, 5); fill!(view(A, :, :, :, :, e), x); end; nothing)
 
 # Scalar indexing.
 fc_getindex(A, i) = A[i]
@@ -590,6 +596,18 @@ build_is_production_build &&
                 fc_llvm(fill!, (A, Float64))
             end) skip=skipped
         end
+    end
+
+    fc_run_bounds_check_elision_checks &&
+    @testset "`fill!` of views in a loop elides the bounds check and vectorizes (issue #200)" begin
+        @test (@filecheck begin
+            @check "define"
+            @check_not fc_bounds_error
+            @check "store $fc_vector_double"
+            @check_not fc_bounds_error
+            @check "{{^}}}"
+            fc_llvm(fc_fill_slices!, (fc_fill_array, Float64))
+        end) skip=fc_fill_slices_skipped
     end
 
     @testset "broadcasting does not call `objectid` (issue #63)" begin
