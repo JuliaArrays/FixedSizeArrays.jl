@@ -265,6 +265,12 @@ fsa_show_5(::FixedSizeArray{T, N, Mem}) where {T, N, Mem} = nothing
         @test strides(m) === (1, 3, 12, 24)
         @test size(m, 2) == 4 && size(m, 4) == 5
         @test Base.return_types(a -> Val(stride(a, 2)), (M,)) == [Val]
+        # the first stride is known to inference also with dynamic sizes
+        @test Base.return_types(a -> Val(stride(a, 1)), (M,)) == [Val{1}]
+        @test Base.return_types(a -> Val(stride(a, 1)), (FixedSizeMatrixDefault{Float64},)) == [Val{1}]
+        @test stride(m, 1) == 1 && stride(m, 3) == 12 && stride(m, 5) == length(m)
+        @test stride(FixedSizeArrayDefault{Float64, 0}(undef), 1) == 1
+        @test_throws BoundsError stride(m, 0)
         # the static dimensions take no space
         @test sizeof(T) == sizeof(FixedSizeVectorDefault{Float64})
         @test sizeof(M) == sizeof(FixedSizeArrayDefault{Float64, 2})

@@ -411,6 +411,16 @@ end
 
 Base.strides(a::FixedSizeArrayDims) = Base.size_to_strides(1, size(a)...)
 
+# Same as the generic method of `Base`, but with the first stride known to inference also
+# for dynamic sizes.  Since `stride` is `:consistent` for `FixedSizeArray`s, inference
+# uses semi-concrete evaluation for `stride(a, 1)`, which loses the constant first element
+# of `strides(a)`.  Before Julia v1.14 the optimizer then does not fold the
+# `stride(a, 1) == 1` checks of `LinearAlgebra`, which blocks inlining of `gemm_wrapper!`
+# and slows down matrix multiplications.  For `ndims(a) == 0` the result is also `1`, as
+# `length(a) == 1`.
+Base.stride(a::FixedSizeArrayDims, k::Integer) =
+    isone(k) ? 1 : (k ≤ ndims(a) ? strides(a)[k] : length(a))
+
 # safe product of a tuple of integers, for calculating dimensions size
 
 @noinline function throw_checked_dims(shape::Tuple)
