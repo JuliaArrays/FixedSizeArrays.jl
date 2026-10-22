@@ -620,20 +620,6 @@ for A ∈ (Array, optional_generic_memory...)  # Add more? Too bad we have to ha
     end
 end
 
-# `fill!`: loop over the parent, as the generic fallback, iterating over `eachindex` of the
-# array itself, does not elide the bounds checks on Julia v1.13 and later, so does not
-# vectorize: <https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200>.
-# Forwarding to `fill!` of the parent instead is slower for short arrays on these versions.
-
-function Base.fill!(a::FixedSizeArrayDims{T}, x) where {T}
-    xT = x isa T ? x : convert(T, x)::T
-    mem = parent(a)
-    for i ∈ eachindex(mem)
-        @inbounds mem[i] = xT
-    end
-    a
-end
-
 # `copy!`: avoid the `resize!` branch of `copy!(::AbstractVector, ::AbstractVector)`
 
 function Base.copy!(dst::FixedSizeArrayDims{<:Any, 1}, src::AbstractVector)
@@ -766,6 +752,17 @@ function wrap(::Type{FSA}, parent::DenseVector, size1::Union{Integer, Val}, size
 end
 function wrap(::Type{FSA}, parent::DenseVector) where {FSA <: FixedSizeArrayDims}
     wrap(FSA, parent, (length(parent),))
+end
+
+if isdefined(Base, :unchecked_oneto) && (Base.unchecked_oneto isa Function)
+    # This is an internal, non-public function, which Base uses for `Array` and `Memory`.
+    # The generic `eachindex` is `OneTo(length(a))`, which clamps the length with
+    # `max(0, length(a))`: LLVM does not see through it in loops over `eachindex` which
+    # store into the array, so it keeps their bounds checks and does not vectorize them.
+    # The length of a `FixedSizeArray` is never negative, `checked_dims` guarantees it.
+    Base.eachindex(::IndexLinear, a::FixedSizeArrayDims) = Base.unchecked_oneto(length(a))
+    # Avoid an ambiguity with `eachindex(::IndexLinear, ::AbstractVector)`.
+    Base.eachindex(::IndexLinear, a::FixedSizeArrayDims{<:Any, 1}) = Base.unchecked_oneto(length(a))
 end
 
 # `iterate`: the `AbstractArray` fallback doesn't perform well, so add our own methods (copied from `Base.Array`)
