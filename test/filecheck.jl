@@ -47,7 +47,7 @@ const fc_run_bounds_error_name_checks = fc_run_bounds_check_elision_checks && VE
 # https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200: since Julia 1.13 (which
 # dropped `@inbounds` from the generic `fill!`) LLVM does not elide the bounds check in
 # `fill!` for views of `FixedSizeArray`s, and so does not vectorize the loop.
-# `FixedSizeArray`s themselves have a `fill!` method of their own, which does not have
+# `FixedSizeArray`s themselves have an `eachindex` method of their own, which does not have
 # this problem.  (`v"1.13-"` to include the prereleases of v1.13.)
 const fc_fill_view_bounds_check_skipped = VERSION >= v"1.13-"
 # When `fill!` of views is inlined in a loop over the slices of an array (as in issue #200),
