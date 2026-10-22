@@ -47,7 +47,7 @@ const fc_run_bounds_error_name_checks = fc_run_bounds_check_elision_checks && VE
 # https://github.com/JuliaArrays/FixedSizeArrays.jl/issues/200: since Julia 1.13 (which
 # dropped `@inbounds` from the generic `fill!`) LLVM does not elide the bounds check in
 # `fill!` for views of `FixedSizeArray`s, and so does not vectorize the loop.
-# `FixedSizeArray`s themselves have a `fill!` method of their own, which does not have
+# `FixedSizeArray`s themselves have an `eachindex` method of their own, which does not have
 # this problem.  (`v"1.13-"` to include the prereleases of v1.13.)
 const fc_fill_view_bounds_check_skipped = VERSION >= v"1.13-"
 # When `fill!` of views is inlined in a loop over the slices of an array (as in issue #200),
@@ -148,6 +148,8 @@ end
 fc_store_loop!(A) = (for i in eachindex(A); A[i] = i; end; nothing)
 fc_fill_loop!(A, x) = (for i in eachindex(A); A[i] = x; end; nothing)
 fc_increment_loop!(A) = (for i in eachindex(A); A[i] += 1; end; nothing)
+# Loop over `eachindex` of two arrays, storing into the first one.
+fc_add_loop!(A, B) = (for i in eachindex(A, B); A[i] += B[i]; end; nothing)
 
 # Scalar indexing.
 fc_getindex(A, i) = A[i]
@@ -158,6 +160,11 @@ const fc_static_dims_array = FixedSizeArrayDims{Float64, 3, Tuple{StaticInt{5}, 
 # The same, with the static dimensions as `Val`s.
 const fc_val_dims_array = FixedSizeArrayDims{Float64, 3, Tuple{Val{5}, Val{4}, Int}, FixedSizeArrays.default_underlying_storage_type{Float64}}
 const fc_static_dims_arrays = (fc_static_dims_array, fc_val_dims_array)
+# Arrays with all dimensions static, whose length is a compile-time constant.
+const fc_all_static_dims_arrays = (
+    FixedSizeArrayDims{Float64, 2, Tuple{StaticInt{2}, StaticInt{4}}, FixedSizeArrays.default_underlying_storage_type{Float64}},
+    FixedSizeArrayDims{Float64, 2, Tuple{Val{2}, Val{4}}, FixedSizeArrays.default_underlying_storage_type{Float64}},
+)
 fc_getindex(A, i, j, k) = A[i, j, k]
 fc_getindex_inbounds(A, i, j, k) = @inbounds A[i, j, k]
 
@@ -649,6 +656,17 @@ build_is_production_build &&
                 fc_llvm(fc_simd_ivdep!, (FixedSizeVectorDefault{Float64}, FixedSizeVectorDefault{Float64}, Float64))
             end
         end
+        @testset "`eachindex` of two arrays: $(A)" for A in (
+            FixedSizeArrayDefault{Float64, 1}, FixedSizeArrayDefault{Float64, 2},
+            FixedSizeArrayDefault{Float64, 3}, fc_static_dims_arrays...,
+        )
+            @test @filecheck begin
+                @check "define"
+                @check fc_vector_body
+                @check fc_vector_double
+                fc_llvm(fc_add_loop!, (A, A))
+            end
+        end
     end
 
     fc_run_bounds_check_elision_checks &&
@@ -678,6 +696,21 @@ build_is_production_build &&
                 @check fc_vector_double
                 fc_llvm(f, (A, args...))
             end) skip=(VERSION < v"1.13" || f === fc_sum_loop)
+        end
+    end
+
+    fc_run_bounds_check_elision_checks &&
+    @testset "loops over `eachindex` of arrays with all dimensions static are fully unrolled" begin
+        # The length of the array is a compile-time constant: no loop, no bounds check.
+        @testset "$(f) $(A)" for (f, args) in (
+                (fc_sum_loop, ()), (fc_store_loop!, ()), (fc_fill_loop!, (Float64,)), (fc_increment_loop!, ()),
+            ), A in fc_all_static_dims_arrays
+            @test @filecheck begin
+                @check "define"
+                @check_not "{{$fc_bounds_error_alternatives| br | phi }}"
+                @check "{{^}}}"
+                fc_llvm(f, (A, args...))
+            end
         end
     end
 
