@@ -15,6 +15,9 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Static = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
 StaticArrayInterface = "0d7ed370-da01-4f52-bd93-41d350b8b718"
 
+[sources]
+CheckedSizeProduct = {rev = "unrolled-tuple-reductions", url = "https://github.com/JuliaArrays/CheckedSizeProduct.jl.git"}
+
 [extensions]
 FixedSizeArraysAdaptExt = "Adapt"
 FixedSizeArraysMPIExt = "MPI"
