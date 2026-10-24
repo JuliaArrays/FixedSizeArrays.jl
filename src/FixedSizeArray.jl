@@ -451,8 +451,13 @@ function (::Type{<:(FixedSizeArrayBroadcastStyle{N, Mem} where {N})})(::Val{M}) 
     FixedSizeArrayBroadcastStyle{m, Mem}()  # `FixedSizeArray` supports any dimensionality
 end
 
-function Base.BroadcastStyle(::Union{Type{<:(FixedSizeArrayDims{T, N, D, Mem} where {T, D})},
-                                     Type{<:(SubArray{T, N, <:FixedSizeArrayDims{T, N, <:Any, Mem}} where {T})}}) where {N, Mem}
+# Two methods instead of one with a `Union` of both signatures: such a method invalidates
+# compiled code calling `BroadcastStyle` of unrelated types, e.g. of `Tuple`s, when
+# loading the package.
+function Base.BroadcastStyle(::Type{<:(FixedSizeArrayDims{T, N, D, Mem} where {T, D})}) where {N, Mem}
+    fixed_size_array_broadcast_style(Val(N), Mem)
+end
+function Base.BroadcastStyle(::Type{<:(SubArray{T, N, <:FixedSizeArrayDims{T, N, <:Any, Mem}} where {T})}) where {N, Mem}
     fixed_size_array_broadcast_style(Val(N), Mem)
 end
 
