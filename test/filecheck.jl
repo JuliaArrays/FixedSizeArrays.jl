@@ -287,6 +287,15 @@ fc_copy!(dst, src) = copy!(dst, src)
     return fc_recurse(A, n - 1) + fc_recurse(A, n - 2)
 end
 
+# Allocation of an array with dynamic dimensions.
+fc_alloc_dims(dims) = FixedSizeArray{Float32}(undef, dims)
+# Allocation of an array with dynamic dimensions passed on to a non-inlined call, the shape
+# of e.g. `*` of matrices (issue #183): inlining it into its callers requires the check of
+# the dimensions to be cheap.
+@noinline fc_dims_kernel!(A) = A
+fc_alloc_dims_kernel(dims) = fc_dims_kernel!(fc_alloc_dims(dims))
+fc_alloc_dims_kernel_twice(dims1, dims2) = (fc_alloc_dims_kernel(dims1), fc_alloc_dims_kernel(dims2))
+
 # The IR of a build instrumented for code coverage is not representative.
 build_is_production_build &&
 @testset "FileCheck: LLVM IR properties" begin
@@ -842,6 +851,26 @@ build_is_production_build &&
             @check_not "{{alloca|gcframe}}"
             @check "}"
             fc_llvm(fc_recurse, (FixedSizeVectorDefault{Float64}, Int))
+        end
+    end
+
+    @testset "the check of dynamic dimensions is inlined: $(N) dimensions" for N in 1:4
+        @test @filecheck begin
+            @check "define"
+            @check_not "checked_size_product"
+            fc_llvm(fc_alloc_dims, (NTuple{N, Int},))
+        end
+    end
+
+    @testset "allocating functions are inlined into their callers (issue #183): $(N) dimensions" for N in 1:3
+        # Both allocations are inlined, leaving only the two calls of the kernel.
+        @test @filecheck begin
+            @check "define"
+            @check_not "j_fc_alloc_dims_kernel_"
+            @check_count 2 "call {{.*}}j_fc_dims_kernel!_"
+            @check_not "j_fc_alloc_dims_kernel_"
+            @check "}"
+            fc_llvm(fc_alloc_dims_kernel_twice, (NTuple{N, Int}, NTuple{N, Int}))
         end
     end
 end
