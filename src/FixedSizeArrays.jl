@@ -3,7 +3,10 @@ module FixedSizeArrays
 using CheckedSizeProduct: checked_size_product
 using Collects: Collect, collect_as
 using LightBoundsErrors: checkbounds_lightboundserror
-using LightBoundsErrors: LightBoundsError as BoundsErrorLight
+using LightBoundsErrors: LightBoundsError
+# We use `const` instead of `using...as...` syntax only to work around a bug in
+# ExplicitImports: <https://github.com/JuliaTesting/ExplicitImports.jl/issues/185>.
+const BoundsErrorLight = LightBoundsError
 
 const default_underlying_storage_type = (@isdefined Memory) ? Memory : Vector
 
