@@ -114,7 +114,7 @@ jobs:
       with:
         version: ${{ matrix.julia_version }}
         show-versioninfo: true
-    - uses: julia-actions/cache@v3
+    - uses: julia-actions/cache@ib/prune-objcache
     - uses: julia-actions/julia-runtest@v1
       env:
         BUILD_IS_PRODUCTION_BUILD: false
