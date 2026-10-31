@@ -11,6 +11,9 @@ import Aqua
 
 # The memory backends to test with.
 const storage_types = (FixedSizeArrays.optional_memory..., Vector)
+# The memory backends including memory references (Julia v1.11 and later), for the tests
+# which do not assume that the parent is a `DenseVector` of exactly the length of the array.
+const all_storage_types = (storage_types..., FixedSizeArrays.optional_memory_ref...)
 
 # Check if the compilation options allow maximum performance.
 const build_is_production_build_env_name = "BUILD_IS_PRODUCTION_BUILD"
@@ -55,13 +58,13 @@ end
 
 # helpers for constructing the type constructors
 
-function fsa(vec_type::Type{<:DenseVector})
+function fsa(vec_type::Type)
     FixedSizeArray{T,N,vec_type{T}} where {T,N}
 end
-function fsm(vec_type::Type{<:DenseVector})
+function fsm(vec_type::Type)
     fsa(vec_type){T,2} where {T}
 end
-function fsv(vec_type::Type{<:DenseVector})
+function fsv(vec_type::Type)
     fsa(vec_type){T,1} where {T}
 end
 
@@ -253,7 +256,7 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
     include("filecheck.jl")
 
     @testset verbose=true "test sets for multiple supported storage types" begin
-        for storage_type ∈ storage_types
+        for storage_type ∈ all_storage_types
             FSV = fsv(storage_type)
             FSM = fsm(storage_type)
             FSA = fsa(storage_type)
@@ -423,7 +426,7 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
                 end
             end
 
-            @testset "`FixedSizeArrays.wrap`" begin
+            storage_type === ((@isdefined MemoryRef) ? MemoryRef : nothing) || @testset "`FixedSizeArrays.wrap`" begin
                 # `T` must be a static parameter here rather than a variable captured from the
                 # `for T` loop below: a closure capturing `T` holds it as a `DataType`, so the
                 # `wrap` call inside would be dynamically dispatched, and allocate (Julia v1.11).
@@ -961,7 +964,7 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         rank = MPI.Comm_rank(comm)
         nranks = MPI.Comm_size(comm)
         root = 0
-        @testset "$Mem, $T, $sz" for Mem in storage_types,
+        @testset "$Mem, $T, $sz" for Mem in all_storage_types,
                                      T in (Float64, Int, ComplexF64, MPITestStruct),
                                      sz in ((6,), (2, 3), (2, 3, 4))
             N = length(sz)
@@ -1127,6 +1130,8 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
             @test b == a
         end
     end
+
+    include("memoryref.jl")
 
     @testset "Constant-prop through iterate" begin
         @test Base.return_types() do
