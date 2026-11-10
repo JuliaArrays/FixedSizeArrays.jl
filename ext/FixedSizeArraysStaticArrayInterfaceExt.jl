@@ -7,7 +7,7 @@ module FixedSizeArraysStaticArrayInterfaceExt
 
 using StaticArrayInterface: StaticArrayInterface
 using Static: StaticInt
-using FixedSizeArrays: FixedSizeArrayDims, known_dims, parent_type, static_dims
+using FixedSizeArrays: FixedSizeArrayDims, known_dims, parent_type, static_dims, storage_array_type
 
 # The dimensions with the static ones as `StaticInt`s, also those given as `Val`s.
 to_static_int(d::Union{Int, StaticInt}) = d
@@ -32,9 +32,10 @@ function StaticArrayInterface.known_strides(::Type{<:FixedSizeArrayDims{<:Any, <
 end
 
 # The device of the memory backend, e.g. a GPU memory backend is not a CPU pointer (by
-# default, any strided array with `isbits` elements is assumed to be a CPU pointer).
+# default, any strided array with `isbits` elements is assumed to be a CPU pointer). For a
+# `GenericMemoryRef` backend, the device of its `GenericMemory`.
 function StaticArrayInterface.device(::Type{A}) where {A <: FixedSizeArrayDims}
-    StaticArrayInterface.device(parent_type(A))
+    StaticArrayInterface.device(storage_array_type(parent_type(A)))
 end
 
 end # module FixedSizeArraysStaticArrayInterfaceExt
