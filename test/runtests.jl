@@ -9,6 +9,17 @@ using StaticArrayInterface: StaticArrayInterface
 using Static: static, StaticInt
 import Aqua
 
+# An adaptor with a storage rule only for `Array`, as the adaptors of the GPU packages
+# converting the arguments of a kernel to `isbits` device arrays (e.g. `CuDeviceArray`).
+struct TestDeviceVector{T} <: DenseVector{T}
+    ptr::Ptr{T}
+    len::Int
+end
+Base.size(v::TestDeviceVector) = (v.len,)
+Base.getindex(v::TestDeviceVector, i::Int) = (@boundscheck checkbounds(v, i); unsafe_load(v.ptr, i))
+struct TestKernelAdaptor end
+Adapt.adapt_storage(::TestKernelAdaptor, v::Vector) = TestDeviceVector(pointer(v), length(v))
+
 # The memory backends to test with.
 const storage_types = (FixedSizeArrays.optional_memory..., Vector)
 
@@ -952,6 +963,25 @@ Base.cconvert(::Type{MPI.MPIPtr}, x::MPITestVector) = Base.cconvert(MPI.MPIPtr, 
         @test f == s
         @test parent(f) !== parent(s)
         @test adapt(FixedSizeArray, transpose(s)) isa Transpose{Float64, <:FixedSizeArray}
+        # An adaptor which is not an array type (e.g. the one converting the arguments of
+        # a GPU kernel) has storage rules only for the arrays it knows, so the memory
+        # backend is adapted and the array rewrapped, with and without static dimensions
+        v = wrap(FixedSizeArray, [1.0, 3.0, 2.0, 4.0], (2, 2))
+        GC.@preserve v s begin
+            d = adapt(TestKernelAdaptor(), v)
+            @test d isa FixedSizeArray{Float64, 2, TestDeviceVector{Float64}}
+            @test isbits(d)
+            @test size(d) == size(v)
+            @test d == v
+            @test adapt(TestKernelAdaptor(), d) === d
+            ds = adapt(TestKernelAdaptor(), s)
+            @test ds isa FixedSizeArrayDims{Float64, 2, Tuple{StaticInt{2}, Int}, TestDeviceVector{Float64}}
+            @test isbits(ds)
+            @test ds == s
+            @test adapt(TestKernelAdaptor(), transpose(v)) isa Transpose{Float64, <:FixedSizeArray{Float64, 2, TestDeviceVector{Float64}}}
+        end
+        # Adapting to an array type still converts as a whole
+        @test adapt(Array, v) isa Matrix{Float64}
     end
 
 
