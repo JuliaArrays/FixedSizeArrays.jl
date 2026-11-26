@@ -235,7 +235,8 @@ The static dimensions are also available to other packages through the package e
 The package has [extensions](https://pkgdocs.julialang.org/v1/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)) which are loaded automatically together with the following packages:
 
 * [Adapt.jl](https://github.com/JuliaGPU/Adapt.jl): `adapt(FixedSizeArray, x)` converts the arrays in `x` to `FixedSizeArray`s, also inside wrappers such as `Adjoint`, see the [constructors](@ref "Constructors") above.
-  Conversely, `adapt(to, a)` converts a `FixedSizeArray` `a` as a whole, e.g. `adapt(CuArray, a)` is a `CuArray`, while for an array with static dimensions it adapts the memory backend and wraps it again, so that `adapt(CuArray, a)` is a `FixedSizeArrayDims` backed by a `CuVector`, with the same static dimensions.
+  Conversely, adapting to an array type converts a `FixedSizeArray` `a` as a whole, e.g. `adapt(CuArray, a)` is a `CuArray`, while for an array with static dimensions it adapts the memory backend and wraps it again, so that `adapt(CuArray, a)` is a `FixedSizeArrayDims` backed by a `CuVector`, with the same static dimensions.
+  All other adaptors (e.g. the ones converting the arguments of a GPU kernel) adapt the memory backend and wrap it again, with and without static dimensions.
   `FixedSizeArrayDims` itself is not an `adapt` target: `adapt(FixedSizeArrayDims, x)` returns `x` unchanged, since the static dimensions can not be derived from `x`, use the [constructors](@ref "Constructing arrays with static dimensions") instead;
 * [MPI.jl](https://github.com/JuliaParallel/MPI.jl) (v0.20.28 or later): the arrays of this package, and `SubArray`s of them, can be used directly as communication buffers in MPI operations, e.g. `MPI.Send`, `MPI.Recv!`, `MPI.Bcast!`, `MPI.Allreduce!` and `MPI.Gatherv!`;
 * [Random.jl](https://docs.julialang.org/en/v1/stdlib/Random/): `rand!(a)` fills the array in place;
