@@ -172,6 +172,16 @@ fc_getindex_inbounds(A, i, j, k) = @inbounds A[i, j, k]
 fc_node_sum(u, i, j, k) = @inbounds u[1, i, j, k] + u[2, i, j, k] + u[3, i, j, k] + u[4, i, j, k] + u[5, i, j, k]
 const fc_node_val_dims_array = FixedSizeArrayDims{Float64, 4, Tuple{Val{5}, Int, Int, Int}, FixedSizeArrays.default_underlying_storage_type{Float64}}
 fc_setindex_inbounds!(A, i, j, k, x) = (@inbounds A[i, j, k] = x; nothing)
+# Short loops over the nodes of an element (one variable, or all of them), as in Trixi.jl.
+fc_nodes_loop!(u, v, j, k) = (for i in axes(u, 2); @inbounds u[v, i, j, k] += 1.0; end; nothing)
+fc_node_vars_loop!(u, j, k) = (for i in axes(u, 2), v in axes(u, 1); @inbounds u[v, i, j, k] += 1.0; end; nothing)
+
+# Since Julia 1.13, if the Cartesian linear index makes every index zero-based first
+# (`(i - 1) + n1 * ((j - 1) + n2 * (k - 1))`), LLVM can prove that the index does not wrap
+# in loops over one of the indices. The loop vectorizer then needs no runtime check of
+# that (`vector.scevcheck`) and no scalar fallback loop. Before 1.13 the IR is the same
+# with both forms of the index.
+const fc_run_horner_offset_checks = fc_run_bounds_check_elision_checks && VERSION >= v"1.13"
 
 # In-place broadcasting.
 fc_broadcast!(A) = (A .= A .+ A; nothing)
@@ -565,6 +575,22 @@ build_is_production_build &&
             @check_not "{{mul|shl}}"
             @check "ret double"
             fc_llvm(fc_node_sum, (A, Int, Int, Int))
+        end
+    end
+
+    fc_run_horner_offset_checks &&
+    @testset "loops over the nodes of an element vectorize without a runtime check of the index" begin
+        @testset "$(f) $(A)" for (f, A, args) in (
+            (fc_nodes_loop!, fc_node_val_dims_array, (Int, Int, Int)),
+            (fc_node_vars_loop!, FixedSizeArrayDefault{Float64, 4}, (Int, Int)),
+        )
+            @test @filecheck begin
+                @check "define"
+                @check_not "vector.scevcheck"
+                @check fc_vector_body
+                @check_not "vector.scevcheck"
+                fc_llvm(f, (A, args...))
+            end
         end
     end
 
