@@ -352,17 +352,23 @@ function Base.isassigned(a::FixedSizeArrayDims, i::Int)
 end
 
 # Cartesian indexing: the column-major linear index of the (in-bounds) indices `inds` for
-# the dimensions `dims` in Horner form, e.g. `i + n1 * ((j - 1) + n2 * (k - 1))` for the
-# indices `(i, j, k)`, where the factors are constants as long as the dimensions are
-# static. This needs fewer integer operations than a sum of strided terms
+# the dimensions `dims` in Horner form, e.g. `1 + (i - 1) + n1 * ((j - 1) + n2 * (k - 1))`
+# for the indices `(i, j, k)`, where the factors are constants as long as the dimensions
+# are static. This needs fewer integer operations than a sum of strided terms
 # (`1 + (i - 1) + n1 * (j - 1) + (n1 * n2) * (k - 1)`): in the flux differencing kernels
 # of Trixi.jl, the volume integral is 2.5-3.5% faster.
 function static_size_linear_index(dims::Tuple{Vararg{Any, N}}, inds::NTuple{N, Int}) where {N}
-    horner_index(map(dim_value, dims), inds)
+    horner_offset(map(dim_value, dims), inds) + 1
 end
-horner_index(::Tuple{Any}, inds::Tuple{Int}) = inds[1]
-function horner_index(ds::Tuple, inds::Tuple)
-    inds[1] + ds[1] * (horner_index(Base.tail(ds), Base.tail(inds)) - 1)
+# The zero-based offset `(i - 1) + n1 * ((j - 1) + n2 * (k - 1))`. Each index is made
+# zero-based before it is used, instead of subtracting one from the partial sums
+# (`i + n1 * ((j + n2 * (k - 1)) - 1)`, which has the same number of operations). The
+# association matters for LLVM's loop vectorizer since Julia v1.12 (LLVM 18): with the
+# latter form it does not vectorize short loops over an index, e.g. over the nodes of an
+# element, while it does with the former.
+horner_offset(::Tuple{Any}, inds::Tuple{Int}) = inds[1] - 1
+function horner_offset(ds::Tuple, inds::Tuple)
+    (inds[1] - 1) + ds[1] * horner_offset(Base.tail(ds), Base.tail(inds))
 end
 
 # The linear index of the (in-bounds) indices `inds`: with the dimensions if there is one
